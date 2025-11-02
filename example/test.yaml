@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=../valueSchema.json
+replicas: 3
+automountServiceAccountToken: false
+securityContext: '{"runAsUser": 32}'
+podLabels:
+  log-format: "json"
+readinessProbe:
+  timeout: 10
+envFromSecret: "my-secret"
+envFromSecrets:
+  - "secret1"
+  - "secret2"
+extraLabels:
+  name: "grafana"
+  version: "10"
+env:
+  Env: "lol"
+image:
+  registry: "ghcr.io"
+  repository: "myorg/grafana"
+  pullPolicy: "Always"
+service:
+  enabled: true
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+    - "IPv4"
+    - "IPv6"
+  loadBalancerClass: "external"
+  loadBalancerSourceRanges:
+    - "10.0.0.0/8"
+    - "192.168.0.0/16"
+  port: 8080
+  targetPort: 3000
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    prometheus.io/scrape: "true"
+  labels:
+    app: "grafana"
+    environment: "production"
+  portName: "http"
+  appProtocol: "http"
+  sessionAffinity: "ClientIP"

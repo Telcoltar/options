@@ -213,6 +213,30 @@ func (o *baseOption[T, Self]) Transform(transform func(value T) T) Self {
 	return o.self
 }
 
+func (o *baseOption[T, Self]) Enum(allowedValues ...T) Self {
+	o.enumValues = allowedValues
+	o.checks = append(o.checks, func(value T) bool {
+		for _, allowed := range allowedValues {
+			if reflect.DeepEqual(value, allowed) {
+				return true
+			}
+		}
+		return false
+	})
+	return o.self
+}
+
+func (o *baseOption[T, Self]) extractEnumValues() []any {
+	if len(o.enumValues) == 0 {
+		return nil
+	}
+	result := make([]any, len(o.enumValues))
+	for i, v := range o.enumValues {
+		result[i] = v
+	}
+	return result
+}
+
 func (o *baseOption[T, Self]) Set(value T) {
 	if o.transform != nil {
 		value = o.transform(value)
@@ -254,19 +278,6 @@ func NewBase[T any](name string) *Base[T] {
 	return opt
 }
 
-func (o *Base[T]) Enum(allowedValues ...T) *Base[T] {
-	o.enumValues = allowedValues
-	o.checks = append(o.checks, func(value T) bool {
-		for _, allowed := range allowedValues {
-			if reflect.DeepEqual(value, allowed) {
-				return true
-			}
-		}
-		return false
-	})
-	return o
-}
-
 func (o *Base[T]) JSONSchemaType() string {
 	var zero T
 	return reflectTypeToJSONSchemaType(reflect.TypeOf(zero))
@@ -287,15 +298,4 @@ func (o *Base[T]) JSONSchemaProperty() map[string]any {
 	}
 
 	return property
-}
-
-func (o *Base[T]) extractEnumValues() []any {
-	if len(o.enumValues) == 0 {
-		return nil
-	}
-	result := make([]any, len(o.enumValues))
-	for i, v := range o.enumValues {
-		result[i] = v
-	}
-	return result
 }

@@ -8,6 +8,7 @@ import (
 // Map represents an option type that holds a map of string keys to values.
 type Map[T any] struct {
 	baseOption[map[string]T, *Map[T]]
+	valueEnumValues []T
 }
 
 // NewMap creates a new Map option with the specified name.
@@ -66,6 +67,18 @@ func (om *Map[T]) EmptyDefault() *Map[T] {
 	return om
 }
 
+func (om *Map[T]) Enum(allowedValues ...T) *Map[T] {
+	om.valueEnumValues = allowedValues
+	return om.InnerChecks(func(val T) bool {
+		for _, allowed := range allowedValues {
+			if reflect.DeepEqual(val, allowed) {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func (om *Map[T]) SetAny(value any) error {
 	if typedValue, ok := value.(map[string]T); ok {
 		om.Set(typedValue)
@@ -115,11 +128,21 @@ func (om *Map[T]) JSONSchemaProperty() map[string]any {
 	var zero T
 	valueType := reflectTypeToJSONSchemaType(reflect.TypeOf(zero))
 
+	additional := map[string]any{
+		"type": valueType,
+	}
+
+	if len(om.valueEnumValues) > 0 {
+		enumValues := make([]any, len(om.valueEnumValues))
+		for i, v := range om.valueEnumValues {
+			enumValues[i] = v
+		}
+		additional["enum"] = enumValues
+	}
+
 	property := map[string]any{
-		"type": "object",
-		"additionalProperties": map[string]any{
-			"type": valueType,
-		},
+		"type":                 "object",
+		"additionalProperties": additional,
 	}
 
 	if om.defaultValue != nil {

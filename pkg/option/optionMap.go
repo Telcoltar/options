@@ -13,11 +13,7 @@ type Map[T any] struct {
 // NewMap creates a new Map option with the specified name.
 func NewMap[T any](name string) *Map[T] {
 	om := &Map[T]{}
-	om.self = om
-	om.name = name
-	om.valueFormatFunc = func(value map[string]T) string {
-		return fmt.Sprintf("%v", value)
-	}
+	om.initCommon(name, om)
 	return om
 }
 

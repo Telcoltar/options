@@ -117,6 +117,15 @@ type baseOption[T any, Self any] struct {
 	self            Self
 }
 
+// initCommon sets common defaults for all option types
+func (o *baseOption[T, Self]) initCommon(name string, self Self) {
+	o.self = self
+	o.name = name
+	o.valueFormatFunc = func(value T) string {
+		return fmt.Sprintf("%v", value)
+	}
+}
+
 // Get returns in order: value, defaultValue, empty Value of Type T
 func (o *baseOption[T, Self]) Get() T {
 	if o.value != nil {
@@ -238,27 +247,10 @@ type Base[T any] struct {
 	baseOption[T, *Base[T]]
 }
 
-type (
-	Bool   = Base[bool]
-	String = Base[string]
-)
-
-func NewBool(name string) *Base[bool] {
-	return NewBase[bool](name)
-}
-
-func NewString(name string) *Base[string] {
-	return NewBase[string](name)
-}
-
 // NewBase creates a new Base option with the specified name.
 func NewBase[T any](name string) *Base[T] {
 	opt := &Base[T]{}
-	opt.self = opt
-	opt.name = name
-	opt.valueFormatFunc = func(value T) string {
-		return fmt.Sprintf("%v", value)
-	}
+	opt.initCommon(name, opt)
 	return opt
 }
 

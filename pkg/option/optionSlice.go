@@ -14,11 +14,7 @@ type Slice[T any] struct {
 // NewSlice creates a new Slice option with the specified name.
 func NewSlice[T any](name string) *Slice[T] {
 	os := &Slice[T]{}
-	os.self = os
-	os.name = name
-	os.valueFormatFunc = func(value []T) string {
-		return fmt.Sprintf("%v", value)
-	}
+	os.initCommon(name, os)
 	return os
 }
 

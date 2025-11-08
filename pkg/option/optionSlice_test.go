@@ -121,7 +121,7 @@ func TestOptionSlice_InnerChecks(t *testing.T) {
 }
 
 func TestOptionSlice_Enum_ValidValues(t *testing.T) {
-	opt := NewSlice[string]("test").Enum("IPv4", "IPv6")
+	opt := NewSlice[string]("test").ItemOption.Enum("IPv4", "IPv6")
 	opt.Set([]string{"IPv4", "IPv6"})
 	if !opt.IsValid() {
 		t.Error("Expected valid for allowed values")
@@ -129,7 +129,7 @@ func TestOptionSlice_Enum_ValidValues(t *testing.T) {
 }
 
 func TestOptionSlice_Enum_InvalidValue(t *testing.T) {
-	opt := NewSlice[string]("test").Enum("IPv4", "IPv6")
+	opt := NewSlice[string]("test").ItemOption.Enum("IPv4", "IPv6")
 	opt.Set([]string{"IPv4", "IPv7"})
 	if opt.IsValid() {
 		t.Error("Expected invalid for disallowed value")
@@ -137,7 +137,7 @@ func TestOptionSlice_Enum_InvalidValue(t *testing.T) {
 }
 
 func TestOptionSlice_Enum_IntValues(t *testing.T) {
-	opt := NewSlice[int]("test").Enum(1, 2, 3, 5, 8)
+	opt := NewSlice[int]("test").ItemOption.Enum(1, 2, 3, 5, 8)
 	opt.Set([]int{1, 3, 5})
 	if !opt.IsValid() {
 		t.Error("Expected valid for allowed values")
@@ -149,7 +149,7 @@ func TestOptionSlice_Enum_IntValues(t *testing.T) {
 }
 
 func TestOptionSlice_Enum_EmptySlice(t *testing.T) {
-	opt := NewSlice[string]("test").Enum("red", "green", "blue")
+	opt := NewSlice[string]("test").ItemOption.Enum("red", "green", "blue")
 	opt.Set([]string{})
 	if !opt.IsValid() {
 		t.Error("Expected valid for empty slice")

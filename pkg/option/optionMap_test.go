@@ -131,38 +131,6 @@ func TestOptionMap_SetAny_NonStringKeys(t *testing.T) {
 	}
 }
 
-func TestOptionMap_InnerChecks(t *testing.T) {
-	opt := NewMap[int]("test").InnerChecks(func(val int) bool {
-		return val > 0
-	})
-
-	opt.Set(map[string]int{"a": 1, "b": 2})
-	if !opt.IsValid() {
-		t.Error("Expected valid for all positive values")
-	}
-
-	opt.Set(map[string]int{"a": 1, "b": -1})
-	if opt.IsValid() {
-		t.Error("Expected invalid for negative value")
-	}
-}
-
-func TestOptionMap_KeyChecks(t *testing.T) {
-	opt := NewMap[int]("test").KeyChecks(func(key string) bool {
-		return len(key) > 0 && key[0] != '_'
-	})
-
-	opt.Set(map[string]int{"valid": 1, "another": 2})
-	if !opt.IsValid() {
-		t.Error("Expected valid for keys without underscore prefix")
-	}
-
-	opt.Set(map[string]int{"valid": 1, "_invalid": 2})
-	if opt.IsValid() {
-		t.Error("Expected invalid for key with underscore prefix")
-	}
-}
-
 func TestOptionMap_SetAny_CustomStringType(t *testing.T) {
 	type CustomString string
 	opt := NewMap[CustomString]("test")
@@ -176,5 +144,34 @@ func TestOptionMap_SetAny_CustomStringType(t *testing.T) {
 	result := opt.Get()
 	if result["name"] != "hello" || result["num"] != "42" {
 		t.Errorf("Expected map[name:hello num:42], got %v", result)
+	}
+}
+
+func TestOptionMap_EnumValidation_ValidValues(t *testing.T) {
+	m := NewMap[string]("labels")
+	m.ValueOption.Enum("dev", "prod")
+	m.Set(map[string]string{"env": "dev", "tier": "prod"})
+	if !m.IsValid() {
+		// both values are allowed
+		// map option validity relies on baseOption plus ValueOption checks applied during IsValid
+		t.Errorf("Expected map with allowed enum values to be valid")
+	}
+}
+
+func TestOptionMap_EnumValidation_InvalidValue(t *testing.T) {
+	m := NewMap[string]("labels")
+	m.ValueOption.Enum("dev", "prod")
+	m.Set(map[string]string{"env": "dev", "tier": "stage"})
+	if m.IsValid() {
+		t.Errorf("Expected map with disallowed enum value to be invalid")
+	}
+}
+
+func TestOptionMap_EnumValidation_Default(t *testing.T) {
+	m := NewMap[string]("labels")
+	m.ValueOption.Enum("dev", "prod")
+	m.Default(map[string]string{"env": "prod"})
+	if !m.IsValid() {
+		t.Errorf("Expected default map with allowed enum value to be valid")
 	}
 }

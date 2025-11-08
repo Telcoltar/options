@@ -2,6 +2,9 @@
 replicas: 3
 automountServiceAccountToken: false
 securityContext: '{"runAsUser": 32}'
+persistence:
+  enabled: true
+  size:
 podLabels:
   log-format: "json"
 readinessProbe:

@@ -2,81 +2,45 @@ package option
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 )
 
 // Map represents an option type that holds a map of string keys to values.
 type Map[T any] struct {
 	baseOption[map[string]T, *Map[T]]
-	valueEnumValues []T
+	ValueOption *baseOption[T, *Map[T]]
 }
 
 // NewMap creates a new Map option with the specified name.
 func NewMap[T any](name string) *Map[T] {
 	om := &Map[T]{}
 	om.initCommon(name, om)
-	return om
-}
-
-// InnerTransform applies a transform to each value inside the map on Set.
-func (om *Map[T]) InnerTransform(transform func(val T) T) *Map[T] {
-	om.transform = func(m map[string]T) map[string]T {
-		if m == nil {
-			return nil
-		}
-		res := make(map[string]T, len(m))
-		for k, v := range m {
-			res[k] = transform(v)
-		}
-		return res
-	}
-	return om
-}
-
-func (om *Map[T]) InnerChecks(checks ...func(val T) bool) *Map[T] {
-	for _, check := range checks {
-		om.checks = append(om.checks, func(val map[string]T) bool {
-			for _, elem := range val {
-				if !check(elem) {
-					return false
-				}
-			}
-			return true
-		})
-	}
-	return om
-}
-
-func (om *Map[T]) KeyChecks(checks ...func(key string) bool) *Map[T] {
-	for _, check := range checks {
-		om.checks = append(om.checks, func(val map[string]T) bool {
-			for key := range val {
-				if !check(key) {
-					return false
-				}
-			}
-			return true
-		})
-	}
+	om.ValueOption = &baseOption[T, *Map[T]]{}
+	om.ValueOption.initCommon("", om)
 	return om
 }
 
 func (om *Map[T]) EmptyDefault() *Map[T] {
-	emptyMap := make(map[string]T)
-	om.defaultValue = &emptyMap
-	return om
+	return om.Default(make(map[string]T))
 }
 
-func (om *Map[T]) Enum(allowedValues ...T) *Map[T] {
-	om.valueEnumValues = allowedValues
-	return om.InnerChecks(func(val T) bool {
-		for _, allowed := range allowedValues {
-			if reflect.DeepEqual(val, allowed) {
-				return true
+// IsValid checks if a set value passes all check function
+// if no value is set, but a defaultValue return true
+// if neither is set, return false
+func (om *Map[T]) IsValid() bool {
+	if !om.baseOption.IsValid() {
+		return false
+	}
+	if om.value != nil {
+		for _, elem := range *om.value {
+			om.ValueOption.Set(elem)
+			if !om.ValueOption.IsValid() {
+				return false
 			}
 		}
-		return false
-	})
+	}
+	return true
 }
 
 func (om *Map[T]) SetAny(value any) error {
@@ -95,8 +59,6 @@ func (om *Map[T]) SetAny(value any) error {
 		return fmt.Errorf("map key type must be string, got %v", keyType)
 	}
 
-	var emptyT T
-	targetType := reflect.TypeOf(emptyT)
 	result := make(map[string]T)
 	iter := mapValue.MapRange()
 
@@ -104,50 +66,25 @@ func (om *Map[T]) SetAny(value any) error {
 		key := iter.Key().String()
 		elem := iter.Value().Interface()
 
-		if typedElem, ok := elem.(T); ok {
-			result[key] = typedElem
-			continue
+		if err := om.ValueOption.SetAny(elem); err != nil {
+			return err
 		}
 
-		converted, err := tryConvert(elem, targetType)
-		if err != nil {
-			return fmt.Errorf("cannot convert map value at key %q: %w", key, err)
-		}
-		result[key] = converted.Interface().(T)
+		result[key] = om.ValueOption.Get()
 	}
 
 	om.Set(result)
 	return nil
 }
 
-func (om *Map[T]) JSONSchemaType() string {
-	return "object"
-}
-
-func (om *Map[T]) JSONSchemaProperty() map[string]any {
-	var zero T
-	valueType := reflectTypeToJSONSchemaType(reflect.TypeOf(zero))
-
-	additional := map[string]any{
-		"type": valueType,
-	}
-
-	if len(om.valueEnumValues) > 0 {
-		enumValues := make([]any, len(om.valueEnumValues))
-		for i, v := range om.valueEnumValues {
-			enumValues[i] = v
-		}
-		additional["enum"] = enumValues
-	}
-
+func (om *Map[T]) JSONSchema() map[string]any {
+	additional := om.ValueOption.JSONSchema()
 	property := map[string]any{
 		"type":                 "object",
 		"additionalProperties": additional,
 	}
 
-	if om.defaultValue != nil {
-		property["default"] = *om.defaultValue
-	}
+	maps.Copy(property, om.jsonSchemaProperties)
 
 	return property
 }

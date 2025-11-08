@@ -3,18 +3,18 @@ package grafana
 import "github.com/telcoltar/options/pkg/option"
 
 type ProbeValues struct {
-	InitialDelay     *option.Base[int32]
-	Timeout          *option.Base[int32]
-	FailureThreshold *option.Base[int32]
+	InitialDelay     *option.Simple[int32]
+	Timeout          *option.Simple[int32]
+	FailureThreshold *option.Simple[int32]
 
 	*option.Container
 }
 
 func NewLivenessProbeValues() *ProbeValues {
 	pv := &ProbeValues{
-		InitialDelay:     option.NewBase[int32]("initialDelay").Default(60),
-		Timeout:          option.NewBase[int32]("timeout").Default(30),
-		FailureThreshold: option.NewBase[int32]("failureThreshold").Default(10),
+		InitialDelay:     option.NewSimple[int32]("initialDelay").Default(60),
+		Timeout:          option.NewSimple[int32]("timeout").Default(30),
+		FailureThreshold: option.NewSimple[int32]("failureThreshold").Default(10),
 	}
 
 	pv.Container = option.NewContainer("livenessProbe", pv)
@@ -23,9 +23,9 @@ func NewLivenessProbeValues() *ProbeValues {
 
 func NewReadinessProbeValues() *ProbeValues {
 	pv := &ProbeValues{
-		InitialDelay:     option.NewBase[int32]("initialDelay"),
-		Timeout:          option.NewBase[int32]("timeout"),
-		FailureThreshold: option.NewBase[int32]("failureThreshold"),
+		InitialDelay:     option.NewSimple[int32]("initialDelay"),
+		Timeout:          option.NewSimple[int32]("timeout"),
+		FailureThreshold: option.NewSimple[int32]("failureThreshold"),
 	}
 
 	pv.Container = option.NewContainer("readinessProbe", pv)

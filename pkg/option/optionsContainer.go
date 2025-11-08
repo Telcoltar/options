@@ -62,7 +62,7 @@ func Collect(s any) (map[string]OptionInterface, map[string]*Container) {
 	resultContainers := make(map[string]*Container)
 
 	v := reflect.ValueOf(s)
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 
@@ -83,12 +83,12 @@ func Collect(s any) (map[string]OptionInterface, map[string]*Container) {
 			continue
 		}
 
-		if field.Kind() == reflect.Ptr && !field.IsNil() {
+		if field.Kind() == reflect.Pointer && !field.IsNil() {
 			elem := field.Elem()
 			if elem.Kind() == reflect.Struct {
 				for j := 0; j < elem.NumField(); j++ {
 					embeddedField := elem.Field(j)
-					if embeddedField.Kind() == reflect.Ptr && embeddedField.Type() == reflect.TypeOf((*Container)(nil)) {
+					if embeddedField.Kind() == reflect.Pointer && embeddedField.Type() == reflect.TypeOf((*Container)(nil)) {
 						if !embeddedField.IsNil() {
 							container := embeddedField.Interface().(*Container)
 							resultContainers[container.Name] = container
@@ -109,7 +109,7 @@ func (oc *Container) JSONSchema() map[string]any {
 	properties := make(map[string]any)
 
 	for name, opt := range oc.Options {
-		properties[name] = opt.JSONSchemaProperty()
+		properties[name] = opt.JSONSchema()
 	}
 
 	for name, container := range oc.Containers {

@@ -2,19 +2,22 @@ package option
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 )
 
 // Slice represents an option type that holds a slice of values.
 type Slice[T any] struct {
 	baseOption[[]T, *Slice[T]]
-	itemEnumValues []T
+	ItemOption *baseOption[T, *Slice[T]]
 }
 
 // NewSlice creates a new Slice option with the specified name.
 func NewSlice[T any](name string) *Slice[T] {
 	os := &Slice[T]{}
 	os.initCommon(name, os)
+	os.ItemOption = &baseOption[T, *Slice[T]]{}
+	os.ItemOption.initCommon("", os)
 	return os
 }
 
@@ -47,22 +50,26 @@ func (os *Slice[T]) InnerChecks(checks ...func(val T) bool) *Slice[T] {
 	return os
 }
 
-func (os *Slice[T]) Enum(allowedValues ...T) *Slice[T] {
-	os.itemEnumValues = allowedValues
-	return os.InnerChecks(func(val T) bool {
-		for _, allowed := range allowedValues {
-			if reflect.DeepEqual(val, allowed) {
-				return true
+// IsValid checks if a set value passes all check function
+// if no value is set, but a defaultValue return true
+// if neither is set, return false
+func (os *Slice[T]) IsValid() bool {
+	if !os.baseOption.IsValid() {
+		return false
+	}
+	if os.value != nil {
+		for _, elem := range *os.value {
+			os.ItemOption.Set(elem)
+			if !os.ItemOption.IsValid() {
+				return false
 			}
 		}
-		return false
-	})
+	}
+	return true
 }
 
 func (os *Slice[T]) EmptyDefault() *Slice[T] {
-	emptySlice := make([]T, 0)
-	os.defaultValue = &emptySlice
-	return os
+	return os.Default(make([]T, 0))
 }
 
 func (os *Slice[T]) SetAny(value any) error {
@@ -76,57 +83,31 @@ func (os *Slice[T]) SetAny(value any) error {
 		return fmt.Errorf("cannot convert %T to []%T", value, *new(T))
 	}
 
-	var emptyT T
-	targetType := reflect.TypeOf(emptyT)
 	result := make([]T, sliceValue.Len())
 
 	for i := 0; i < sliceValue.Len(); i++ {
 		elem := sliceValue.Index(i).Interface()
 
-		if typedElem, ok := elem.(T); ok {
-			result[i] = typedElem
-			continue
+		if err := os.ItemOption.SetAny(elem); err != nil {
+			return err
 		}
 
-		converted, err := tryConvert(elem, targetType)
-		if err != nil {
-			return fmt.Errorf("cannot convert slice element at index %d: %w", i, err)
-		}
-		result[i] = converted.Interface().(T)
+		result[i] = os.ItemOption.Get()
 	}
 
 	os.Set(result)
 	return nil
 }
 
-func (os *Slice[T]) JSONSchemaType() string {
-	return "array"
-}
-
-func (os *Slice[T]) JSONSchemaProperty() map[string]any {
-	var zero T
-	itemType := reflectTypeToJSONSchemaType(reflect.TypeOf(zero))
-
-	items := map[string]any{
-		"type": itemType,
-	}
-
-	if len(os.itemEnumValues) > 0 {
-		enumValues := make([]any, len(os.itemEnumValues))
-		for i, v := range os.itemEnumValues {
-			enumValues[i] = v
-		}
-		items["enum"] = enumValues
-	}
+func (os *Slice[T]) JSONSchema() map[string]any {
+	items := os.ItemOption.JSONSchema()
 
 	property := map[string]any{
 		"type":  "array",
 		"items": items,
 	}
 
-	if os.defaultValue != nil {
-		property["default"] = *os.defaultValue
-	}
+	maps.Copy(property, os.jsonSchemaProperties)
 
 	return property
 }

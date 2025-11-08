@@ -3,7 +3,7 @@ package option
 import "testing"
 
 func TestBase_NotZero_Int(t *testing.T) {
-	opt := NewBase[int]("int")
+	opt := NewSimple[int]("int")
 	if opt.NotZero() {
 		t.Error("expected NotZero to be false when no value set")
 	}
@@ -30,7 +30,7 @@ func TestBase_NotZero_Int(t *testing.T) {
 }
 
 func TestBase_NotZero_String(t *testing.T) {
-	opt := NewBase[string]("str")
+	opt := NewSimple[string]("str")
 	if opt.NotZero() {
 		t.Error("expected NotZero to be false when no value set")
 	}
@@ -47,7 +47,7 @@ func TestBase_NotZero_String(t *testing.T) {
 }
 
 func TestBase_NotZero_Bool(t *testing.T) {
-	opt := NewBase[bool]("bool")
+	opt := NewSimple[bool]("bool")
 	opt.Default(false)
 	if opt.NotZero() {
 		t.Error("expected NotZero to be false for default false")

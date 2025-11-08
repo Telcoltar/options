@@ -13,14 +13,14 @@ func TestBaseJSONSchema(t *testing.T) {
 	}{
 		{
 			name:   "string option",
-			option: NewBase[string]("name"),
+			option: NewSimple[string]("name"),
 			expected: map[string]any{
 				"type": "string",
 			},
 		},
 		{
 			name:   "int option with default",
-			option: NewBase[int]("count").Default(10),
+			option: NewSimple[int]("count").Default(10),
 			expected: map[string]any{
 				"type":    "integer",
 				"default": 10,
@@ -28,7 +28,7 @@ func TestBaseJSONSchema(t *testing.T) {
 		},
 		{
 			name:   "bool option",
-			option: NewBase[bool]("enabled").Default(true),
+			option: NewSimple[bool]("enabled").Default(true),
 			expected: map[string]any{
 				"type":    "boolean",
 				"default": true,
@@ -36,7 +36,7 @@ func TestBaseJSONSchema(t *testing.T) {
 		},
 		{
 			name:   "float option",
-			option: NewBase[float64]("ratio").Default(3.14),
+			option: NewSimple[float64]("ratio").Default(3.14),
 			expected: map[string]any{
 				"type":    "number",
 				"default": 3.14,
@@ -46,7 +46,7 @@ func TestBaseJSONSchema(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.option.JSONSchemaProperty()
+			result := tt.option.JSONSchema()
 			if !mapsEqual(result, tt.expected) {
 				t.Errorf("JSONSchemaProperty() = %v, want %v", result, tt.expected)
 			}
@@ -56,7 +56,7 @@ func TestBaseJSONSchema(t *testing.T) {
 
 func TestSliceJSONSchema(t *testing.T) {
 	option := NewSlice[string]("tags")
-	result := option.JSONSchemaProperty()
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type": "array",
@@ -74,7 +74,7 @@ func TestSliceJSONSchema(t *testing.T) {
 
 func TestMapJSONSchema(t *testing.T) {
 	option := NewMap[string]("labels")
-	result := option.JSONSchemaProperty()
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type": "object",
@@ -92,7 +92,7 @@ func TestMapJSONSchema(t *testing.T) {
 
 func TestSliceEmptyDefaultJSONSchema(t *testing.T) {
 	option := NewSlice[string]("tags").EmptyDefault()
-	result := option.JSONSchemaProperty()
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type": "array",
@@ -122,7 +122,7 @@ func TestSliceEmptyDefaultJSONSchema(t *testing.T) {
 
 func TestMapEmptyDefaultJSONSchema(t *testing.T) {
 	option := NewMap[string]("labels").EmptyDefault()
-	result := option.JSONSchemaProperty()
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type": "object",
@@ -135,7 +135,7 @@ func TestMapEmptyDefaultJSONSchema(t *testing.T) {
 	if !mapsEqual(result, expected) {
 		resultJSON, _ := json.MarshalIndent(result, "", "  ")
 		expectedJSON, _ := json.MarshalIndent(expected, "", "  ")
-		t.Errorf("JSONSchemaProperty() =\n%s\nwant\n%s", resultJSON, expectedJSON)
+		t.Errorf("JSONSchema() =\n%s\nwant\n%s", resultJSON, expectedJSON)
 	}
 
 	defaultValue := result["default"]
@@ -152,17 +152,17 @@ func TestMapEmptyDefaultJSONSchema(t *testing.T) {
 
 func TestContainerJSONSchema(t *testing.T) {
 	type TestConfig struct {
-		Name    *Base[string]
-		Count   *Base[int]
-		Enabled *Base[bool]
+		Name    *Simple[string]
+		Count   *Simple[int]
+		Enabled *Simple[bool]
 
 		*Container
 	}
 
 	config := &TestConfig{
-		Name:    NewBase[string]("name").Default("test"),
-		Count:   NewBase[int]("count").Default(5),
-		Enabled: NewBase[bool]("enabled").Default(true),
+		Name:    NewSimple[string]("name").Default("test"),
+		Count:   NewSimple[int]("count").Default(5),
+		Enabled: NewSimple[bool]("enabled").Default(true),
 	}
 	config.Container = NewContainer("TestConfig", config)
 
@@ -196,23 +196,23 @@ func TestContainerJSONSchema(t *testing.T) {
 
 func TestNestedContainerJSONSchema(t *testing.T) {
 	type Inner struct {
-		Value *Base[string]
+		Value *Simple[string]
 		*Container
 	}
 
 	type Outer struct {
-		Name  *Base[string]
+		Name  *Simple[string]
 		Inner *Inner
 		*Container
 	}
 
 	inner := &Inner{
-		Value: NewBase[string]("value").Default("inner"),
+		Value: NewSimple[string]("value").Default("inner"),
 	}
 	inner.Container = NewContainer("inner", inner)
 
 	outer := &Outer{
-		Name:  NewBase[string]("name").Default("outer"),
+		Name:  NewSimple[string]("name").Default("outer"),
 		Inner: inner,
 	}
 	outer.Container = NewContainer("outer", outer)
@@ -250,12 +250,12 @@ func TestNestedContainerJSONSchema(t *testing.T) {
 
 func TestJSONSchemaWithMetadata(t *testing.T) {
 	type TestConfig struct {
-		Name *Base[string]
+		Name *Simple[string]
 		*Container
 	}
 
 	config := &TestConfig{
-		Name: NewBase[string]("name").Default("test"),
+		Name: NewSimple[string]("name").Default("test"),
 	}
 	config.Container = NewContainer("TestConfig", config)
 
@@ -272,14 +272,14 @@ func TestJSONSchemaWithMetadata(t *testing.T) {
 
 func TestJSONSchemaMarshaling(t *testing.T) {
 	type TestConfig struct {
-		Name  *Base[string]
-		Count *Base[int]
+		Name  *Simple[string]
+		Count *Simple[int]
 		*Container
 	}
 
 	config := &TestConfig{
-		Name:  NewBase[string]("name").Default("test"),
-		Count: NewBase[int]("count").Default(5),
+		Name:  NewSimple[string]("name").Default("test"),
+		Count: NewSimple[int]("count").Default(5),
 	}
 	config.Container = NewContainer("TestConfig", config)
 
@@ -301,8 +301,8 @@ func TestJSONSchemaMarshaling(t *testing.T) {
 }
 
 func TestBaseEnumJSONSchema(t *testing.T) {
-	option := NewBase[string]("color").Enum("red", "green", "blue")
-	result := option.JSONSchemaProperty()
+	option := NewSimple[string]("color").Enum("red", "green", "blue")
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type": "string",
@@ -317,8 +317,8 @@ func TestBaseEnumJSONSchema(t *testing.T) {
 }
 
 func TestBaseEnumWithDefaultJSONSchema(t *testing.T) {
-	option := NewBase[int]("size").Enum(1, 2, 3, 5, 8).Default(3)
-	result := option.JSONSchemaProperty()
+	option := NewSimple[int]("size").Enum(1, 2, 3, 5, 8).Default(3)
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type":    "integer",
@@ -334,8 +334,8 @@ func TestBaseEnumWithDefaultJSONSchema(t *testing.T) {
 }
 
 func TestSliceEnumJSONSchema(t *testing.T) {
-	option := NewSlice[string]("ipFamilies").Enum("IPv4", "IPv6")
-	result := option.JSONSchemaProperty()
+	option := NewSlice[string]("ipFamilies").ItemOption.Enum("IPv4", "IPv6")
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type": "array",
@@ -353,8 +353,8 @@ func TestSliceEnumJSONSchema(t *testing.T) {
 }
 
 func TestSliceEnumWithDefaultJSONSchema(t *testing.T) {
-	option := NewSlice[int]("numbers").Enum(1, 2, 3, 5, 8).Default([]int{1, 2})
-	result := option.JSONSchemaProperty()
+	option := NewSlice[int]("numbers").ItemOption.Enum(1, 2, 3, 5, 8).Default([]int{1, 2})
+	result := option.JSONSchema()
 
 	expected := map[string]any{
 		"type": "array",
@@ -363,6 +363,48 @@ func TestSliceEnumWithDefaultJSONSchema(t *testing.T) {
 			"enum": []any{1, 2, 3, 5, 8},
 		},
 		"default": []int{1, 2},
+	}
+
+	if !mapsEqual(result, expected) {
+		resultJSON, _ := json.MarshalIndent(result, "", "  ")
+		expectedJSON, _ := json.MarshalIndent(expected, "", "  ")
+		t.Errorf("JSONSchemaProperty() =\n%s\nwant\n%s", resultJSON, expectedJSON)
+	}
+}
+
+func TestMapEnumJSONSchema(t *testing.T) {
+	m := NewMap[string]("labels")
+	m.ValueOption.Enum("dev", "prod")
+	result := m.JSONSchema()
+
+	expected := map[string]any{
+		"type": "object",
+		"additionalProperties": map[string]any{
+			"type": "string",
+			"enum": []any{"dev", "prod"},
+		},
+	}
+
+	if !mapsEqual(result, expected) {
+		resultJSON, _ := json.MarshalIndent(result, "", "  ")
+		expectedJSON, _ := json.MarshalIndent(expected, "", "  ")
+		t.Errorf("JSONSchemaProperty() =\n%s\nwant\n%s", resultJSON, expectedJSON)
+	}
+}
+
+func TestMapEnumWithDefaultJSONSchema(t *testing.T) {
+	m := NewMap[string]("labels")
+	m.ValueOption.Enum("dev", "prod")
+	m.Default(map[string]string{"env": "dev"})
+	result := m.JSONSchema()
+
+	expected := map[string]any{
+		"type": "object",
+		"additionalProperties": map[string]any{
+			"type": "string",
+			"enum": []any{"dev", "prod"},
+		},
+		"default": map[string]string{"env": "dev"},
 	}
 
 	if !mapsEqual(result, expected) {

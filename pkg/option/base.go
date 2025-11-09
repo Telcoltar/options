@@ -210,6 +210,12 @@ func (o *baseOption[T, Self]) Checks(checks ...func(value T) bool) Self {
 	return o.self
 }
 
+func (o *baseOption[T, Self]) Check(check func(value T) bool, jsonProp map[string]any) Self {
+	o.checks = append(o.checks, check)
+	maps.Copy(o.jsonSchemaProperties, jsonProp)
+	return o.self
+}
+
 func (o *baseOption[T, Self]) Transform(transform func(value T) T) Self {
 	o.transform = transform
 	return o.self

@@ -7,7 +7,7 @@ type ProbeValues struct {
 	Timeout          *option.Simple[int32]
 	FailureThreshold *option.Simple[int32]
 
-	*option.Container
+	*option.Container[ProbeValues]
 }
 
 func NewLivenessProbeValues() *ProbeValues {

@@ -8,6 +8,11 @@ import (
 )
 
 func tryConvert(value any, targetType reflect.Type) (reflect.Value, error) {
+	// Handle nil values
+	if value == nil {
+		return reflect.Zero(targetType), nil
+	}
+
 	inputValue := reflect.ValueOf(value)
 
 	if inputValue.Type().AssignableTo(targetType) {

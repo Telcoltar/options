@@ -15,7 +15,7 @@ type ImageValues struct {
 	PullPolicy  *option.Simple[corev1.PullPolicy]
 	PullSecrets *option.Slice[string]
 
-	*option.Container
+	*option.Container[ImageValues]
 }
 
 // NewImageValues creates a new ImageValues instance with default values
@@ -50,7 +50,7 @@ type ServiceValues struct {
 	AppProtocol              *option.Simple[string]
 	SessionAffinity          *option.Simple[string]
 
-	*option.Container
+	*option.Container[ServiceValues]
 }
 
 // NewServiceValues creates a new ServiceValues instance with default values
@@ -102,7 +102,7 @@ type GrafanaHelmValues struct {
 	Service     *ServiceValues
 	Persistence *PersistenceValues
 
-	*option.Container
+	*option.Container[GrafanaHelmValues]
 }
 
 // NewGrafanaHelmValues creates a new GrafanaHelmValues instance with default values
@@ -125,6 +125,6 @@ func NewGrafanaHelmValues() *GrafanaHelmValues {
 		Service:     NewServiceValues(),
 		Persistence: NewPersistenceValues(),
 	}
-	ghv.Container = option.NewContainer("GrafanaHelmValue", ghv)
+	ghv.Container = option.NewContainer("GrafanaHelmValue", &ghv)
 	return &ghv
 }

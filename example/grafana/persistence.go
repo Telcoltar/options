@@ -15,7 +15,7 @@ type PersistenceValues struct {
 	ExistingClaim    *option.String
 	SubPath          *option.String
 
-	*option.Container
+	*option.Container[PersistenceValues]
 }
 
 func NewPersistenceValues() *PersistenceValues {

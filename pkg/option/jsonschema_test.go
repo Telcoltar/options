@@ -156,7 +156,7 @@ func TestContainerJSONSchema(t *testing.T) {
 		Count   *Simple[int]
 		Enabled *Simple[bool]
 
-		*Container
+		*Container[TestConfig]
 	}
 
 	config := &TestConfig{
@@ -197,13 +197,13 @@ func TestContainerJSONSchema(t *testing.T) {
 func TestNestedContainerJSONSchema(t *testing.T) {
 	type Inner struct {
 		Value *Simple[string]
-		*Container
+		*Container[Inner]
 	}
 
 	type Outer struct {
 		Name  *Simple[string]
 		Inner *Inner
-		*Container
+		*Container[Outer]
 	}
 
 	inner := &Inner{
@@ -251,7 +251,7 @@ func TestNestedContainerJSONSchema(t *testing.T) {
 func TestJSONSchemaWithMetadata(t *testing.T) {
 	type TestConfig struct {
 		Name *Simple[string]
-		*Container
+		*Container[TestConfig]
 	}
 
 	config := &TestConfig{
@@ -274,7 +274,7 @@ func TestJSONSchemaMarshaling(t *testing.T) {
 	type TestConfig struct {
 		Name  *Simple[string]
 		Count *Simple[int]
-		*Container
+		*Container[TestConfig]
 	}
 
 	config := &TestConfig{

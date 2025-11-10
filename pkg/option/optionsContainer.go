@@ -2,6 +2,7 @@ package option
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 
 	"gopkg.in/yaml.v3"
@@ -20,19 +21,21 @@ type ContainerInterface interface {
 // It provides parsing and JSON Schema generation capabilities.
 // The type parameter T represents the source struct type.
 type Container[T any] struct {
-	Name       string
-	Options    map[string]OptionInterface
-	Containers map[string]ContainerInterface
-	source     *T
-	checks     []func(*T) bool
+	Name           string
+	Options        map[string]OptionInterface
+	Containers     map[string]ContainerInterface
+	jsonProperties map[string]any
+	source         *T
+	checks         []func(*T) bool
 }
 
 // NewContainer creates a new Container with the specified name and collects options from the provided struct.
 func NewContainer[T any](name string, source *T) *Container[T] {
 	oc := Container[T]{
-		Name:   name,
-		source: source,
-		checks: make([]func(*T) bool, 0),
+		Name:           name,
+		source:         source,
+		jsonProperties: map[string]any{},
+		checks:         make([]func(*T) bool, 0),
 	}
 	oc.Collect(source)
 	return &oc
@@ -43,9 +46,12 @@ func (oc *Container[T]) GetName() string {
 	return oc.Name
 }
 
-// AddCheck adds a validation check function that receives typed access to the source struct.
+// Check adds a validation check function that receives typed access to the source struct.
 // The check function should return true if validation passes, false otherwise.
-func (oc *Container[T]) AddCheck(check func(*T) bool) *Container[T] {
+// The prop parameter should contain JSON Schema properties that reflect the same validation
+// logic as the check function, allowing external tools to validate the same constraints.
+func (oc *Container[T]) Check(check func(*T) bool, prop map[string]any) *Container[T] {
+	maps.Copy(oc.jsonProperties, prop)
 	oc.checks = append(oc.checks, check)
 	return oc
 }
@@ -185,6 +191,9 @@ func (oc *Container[T]) JSONSchema() map[string]any {
 	if oc.Name != "" {
 		schema["title"] = oc.Name
 	}
+
+	// Add any custom JSON properties from Check() calls
+	maps.Copy(schema, oc.jsonProperties)
 
 	return schema
 }

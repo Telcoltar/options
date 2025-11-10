@@ -414,6 +414,248 @@ func TestMapEnumWithDefaultJSONSchema(t *testing.T) {
 	}
 }
 
+func TestContainerCheckWithIfElseSchema(t *testing.T) {
+	type DeploymentConfig struct {
+		Environment *Simple[string]
+		MinReplicas *Simple[int]
+		MaxReplicas *Simple[int]
+
+		*Container[DeploymentConfig]
+	}
+
+	config := &DeploymentConfig{
+		Environment: NewSimple[string]("environment").Enum("dev", "staging", "prod").Default("dev"),
+		MinReplicas: NewSimple[int]("minReplicas").Default(1),
+		MaxReplicas: NewSimple[int]("maxReplicas").Default(10),
+	}
+	config.Container = NewContainer("DeploymentConfig", config)
+
+	// Add a validation check where BOTH the Go function AND the JSON Schema
+	// express the SAME validation logic:
+	// - In production: minReplicas >= 3 and maxReplicas >= 10
+	// - In non-production: minReplicas >= 1
+	// - Always: minReplicas < maxReplicas
+	config.Container.Check(
+		func(d *DeploymentConfig) bool {
+			// Validate minReplicas < maxReplicas
+			if d.MinReplicas.HasValue() && d.MaxReplicas.HasValue() {
+				if d.MinReplicas.Get() >= d.MaxReplicas.Get() {
+					return false
+				}
+			}
+
+			// Environment-specific validation
+			if d.Environment.HasValue() {
+				env := d.Environment.Get()
+				if env == "prod" {
+					// Production requires higher minimums
+					if d.MinReplicas.HasValue() && d.MinReplicas.Get() < 3 {
+						return false
+					}
+					if d.MaxReplicas.HasValue() && d.MaxReplicas.Get() < 10 {
+						return false
+					}
+				} else {
+					// Non-production requires at least 1 replica
+					if d.MinReplicas.HasValue() && d.MinReplicas.Get() < 1 {
+						return false
+					}
+				}
+			}
+
+			return true
+		},
+		// JSON Schema that reflects the SAME validation logic
+		map[string]any{
+			"if": map[string]any{
+				"properties": map[string]any{
+					"environment": map[string]any{
+						"const": "prod",
+					},
+				},
+			},
+			"then": map[string]any{
+				"properties": map[string]any{
+					"minReplicas": map[string]any{
+						"minimum": 3,
+					},
+					"maxReplicas": map[string]any{
+						"minimum": 10,
+					},
+				},
+			},
+			"else": map[string]any{
+				"properties": map[string]any{
+					"minReplicas": map[string]any{
+						"minimum": 1,
+					},
+				},
+			},
+		},
+	)
+
+	// Test 1: Valid production config
+	t.Run("valid production config", func(t *testing.T) {
+		config.Environment.Set("prod")
+		config.MinReplicas.Set(3)
+		config.MaxReplicas.Set(10)
+		if !config.IsValid() {
+			t.Error("Expected valid production config (minReplicas=3, maxReplicas=10)")
+		}
+	})
+
+	// Test 2: Invalid production config (too few minReplicas)
+	t.Run("invalid production - low minReplicas", func(t *testing.T) {
+		config.Environment.Set("prod")
+		config.MinReplicas.Set(2) // Less than required 3
+		config.MaxReplicas.Set(10)
+		if config.IsValid() {
+			t.Error("Expected invalid: prod requires minReplicas >= 3")
+		}
+	})
+
+	// Test 3: Invalid production config (too few maxReplicas)
+	t.Run("invalid production - low maxReplicas", func(t *testing.T) {
+		config.Environment.Set("prod")
+		config.MinReplicas.Set(3)
+		config.MaxReplicas.Set(9) // Less than required 10
+		if config.IsValid() {
+			t.Error("Expected invalid: prod requires maxReplicas >= 10")
+		}
+	})
+
+	// Test 4: Valid dev config
+	t.Run("valid dev config", func(t *testing.T) {
+		config.Environment.Set("dev")
+		config.MinReplicas.Set(1)
+		config.MaxReplicas.Set(5)
+		if !config.IsValid() {
+			t.Error("Expected valid dev config (minReplicas=1, maxReplicas=5)")
+		}
+	})
+
+	// Test 5: Invalid dev config (minReplicas < 1)
+	t.Run("invalid dev - zero replicas", func(t *testing.T) {
+		config.Environment.Set("dev")
+		config.MinReplicas.Set(0)
+		config.MaxReplicas.Set(5)
+		if config.IsValid() {
+			t.Error("Expected invalid: dev requires minReplicas >= 1")
+		}
+	})
+
+	// Test 6: Invalid regardless of environment (minReplicas >= maxReplicas)
+	t.Run("invalid - minReplicas >= maxReplicas", func(t *testing.T) {
+		config.Environment.Set("dev")
+		config.MinReplicas.Set(10)
+		config.MaxReplicas.Set(5)
+		if config.IsValid() {
+			t.Error("Expected invalid: minReplicas must be < maxReplicas")
+		}
+	})
+
+	// Test 7: Verify JSON Schema includes the if/then/else
+	t.Run("schema generation", func(t *testing.T) {
+		schema := config.JSONSchema()
+
+		if schema["type"] != "object" {
+			t.Errorf("schema type = %v, want object", schema["type"])
+		}
+
+		// Verify if/then/else properties exist in schema
+		if _, ok := schema["if"]; !ok {
+			t.Error("Expected schema to contain 'if' property")
+		}
+
+		if _, ok := schema["then"]; !ok {
+			t.Error("Expected schema to contain 'then' property")
+		}
+
+		if _, ok := schema["else"]; !ok {
+			t.Error("Expected schema to contain 'else' property")
+		}
+
+		// Verify the if condition
+		ifClause, ok := schema["if"].(map[string]any)
+		if !ok {
+			t.Fatal("if clause is not a map")
+		}
+
+		ifProps, ok := ifClause["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("if.properties is not a map")
+		}
+
+		envIf, ok := ifProps["environment"].(map[string]any)
+		if !ok {
+			t.Fatal("if.properties.environment is not a map")
+		}
+
+		if envIf["const"] != "prod" {
+			t.Errorf("if.properties.environment.const = %v, want 'prod'", envIf["const"])
+		}
+
+		// Verify the then clause (production requirements)
+		thenClause, ok := schema["then"].(map[string]any)
+		if !ok {
+			t.Fatal("then clause is not a map")
+		}
+
+		thenProps, ok := thenClause["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("then.properties is not a map")
+		}
+
+		minReplicasThen, ok := thenProps["minReplicas"].(map[string]any)
+		if !ok {
+			t.Fatal("then.properties.minReplicas is not a map")
+		}
+
+		if minReplicasThen["minimum"] != 3 {
+			t.Errorf("then.properties.minReplicas.minimum = %v, want 3", minReplicasThen["minimum"])
+		}
+
+		maxReplicasThen, ok := thenProps["maxReplicas"].(map[string]any)
+		if !ok {
+			t.Fatal("then.properties.maxReplicas is not a map")
+		}
+
+		if maxReplicasThen["minimum"] != 10 {
+			t.Errorf("then.properties.maxReplicas.minimum = %v, want 10", maxReplicasThen["minimum"])
+		}
+
+		// Verify the else clause (non-production requirements)
+		elseClause, ok := schema["else"].(map[string]any)
+		if !ok {
+			t.Fatal("else clause is not a map")
+		}
+
+		elseProps, ok := elseClause["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("else.properties is not a map")
+		}
+
+		minReplicasElse, ok := elseProps["minReplicas"].(map[string]any)
+		if !ok {
+			t.Fatal("else.properties.minReplicas is not a map")
+		}
+
+		if minReplicasElse["minimum"] != 1 {
+			t.Errorf("else.properties.minReplicas.minimum = %v, want 1", minReplicasElse["minimum"])
+		}
+
+		// Verify that standard properties still exist
+		properties, ok := schema["properties"].(map[string]any)
+		if !ok {
+			t.Fatal("properties is not a map")
+		}
+
+		if len(properties) != 3 {
+			t.Errorf("properties length = %d, want 3", len(properties))
+		}
+	})
+}
+
 func mapsEqual(a, b map[string]any) bool {
 	if len(a) != len(b) {
 		return false

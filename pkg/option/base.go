@@ -2,6 +2,7 @@ package option
 
 import (
 	"fmt"
+	"log"
 	"maps"
 	"reflect"
 	"strconv"
@@ -82,6 +83,7 @@ type baseOption[T any, Self any] struct {
 	jsonSchemaProperties map[string]any
 	jsonSchemaType       string
 	name                 string
+	required             bool
 	value                *T
 	valueFormatFunc      func(value T) string
 	checks               []func(value T) bool
@@ -93,6 +95,7 @@ type baseOption[T any, Self any] struct {
 func (o *baseOption[T, Self]) initCommon(name string, self Self) {
 	o.self = self
 	o.name = name
+	o.required = false
 	o.jsonSchemaProperties = make(map[string]any)
 	o.jsonSchemaType = getJSONSchemaType[T]()
 	o.valueFormatFunc = func(value T) string {
@@ -178,6 +181,7 @@ func (o *baseOption[T, Self]) IsValid() bool {
 	if o.value != nil {
 		for _, check := range o.checks {
 			if !check(*o.value) {
+				log.Println("not valid: ", o.name)
 				return false
 			}
 		}
@@ -186,7 +190,11 @@ func (o *baseOption[T, Self]) IsValid() bool {
 	if o.defaultValue != nil {
 		return true
 	}
-	return false
+	if o.required {
+		log.Println("not valid empty and required: ", o.name)
+		return false
+	}
+	return true
 }
 
 // GetValid returns Get(),IsValid()

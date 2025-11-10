@@ -27,7 +27,7 @@ func NewPersistenceValues() *PersistenceValues {
 			Transform(func(value string) string {
 				return strings.ToLower(value)
 			}),
-		Size:             option.NewString("size"),
+		Size:             option.NewString("size").Regex("^([+-]?[0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$"),
 		StorageClassName: option.NewString("storageClassName"),
 		ExtraPvcLabels:   option.NewMap[string]("extraPvcLabels"),
 		ExistingClaim:    option.NewString("existingClaim"),
@@ -35,5 +35,28 @@ func NewPersistenceValues() *PersistenceValues {
 	}
 
 	pv.Container = option.NewContainer("persistence", pv)
+
+	pv.Check(func(pv *PersistenceValues) bool {
+		if pv.Enabled.Get() {
+			if !pv.Size.HasValue() {
+				return false
+			}
+		}
+		return true
+	},
+		map[string]any{
+			"if": map[string]any{
+				"properties": map[string]any{
+					"enabled": map[string]any{
+						"const": true,
+					},
+				},
+			},
+			"then": map[string]any{
+				"required": []string{"size"},
+			},
+		},
+	)
+
 	return pv
 }

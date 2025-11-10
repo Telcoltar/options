@@ -28,7 +28,7 @@ func Build(name string, values *GrafanaHelmValues) (builders.Builders, error) {
 	deploy.Selector(selectorLabels)
 
 	if values.Persistence.Enabled.Get() && !values.Persistence.ExistingClaim.NotZero() {
-		AddPVC(name, deploy, values.Persistence)
+		resources = append(resources, AddPVC(name, deploy, values.Persistence))
 	}
 
 	labels := make(map[string]string)

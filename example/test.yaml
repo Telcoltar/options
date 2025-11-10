@@ -4,7 +4,7 @@ automountServiceAccountToken: false
 securityContext: '{"runAsUser": 32}'
 persistence:
   enabled: true
-  size:
+  size: "50Gi"
 podLabels:
   log-format: "json"
 readinessProbe:

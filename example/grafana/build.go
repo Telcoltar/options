@@ -5,8 +5,8 @@ import (
 
 	"github.com/telcoltar/options/pkg/option"
 
-	"github.com/telcoltar/kubernetes-builders/builders"
-	"github.com/telcoltar/kubernetes-builders/utils"
+	"github.com/Telcoltar/kubernetes-resources/builders"
+	"github.com/Telcoltar/kubernetes-resources/utils"
 )
 
 func Build(name string, values *GrafanaHelmValues) (builders.Builders, error) {

@@ -202,6 +202,6 @@ func (oc *Container[T]) JSONSchema() map[string]any {
 // This produces a complete, standalone JSON Schema document.
 func (oc *Container[T]) JSONSchemaWithMetadata() map[string]any {
 	schema := oc.JSONSchema()
-	schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+	schema["$schema"] = "https://json-schema.org/draft-07/schema"
 	return schema
 }

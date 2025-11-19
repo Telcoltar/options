@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../valueSchema.json
+# yaml-language-server: $schema=../../valueSchema.json
 replicas: 3
 automountServiceAccountToken: false
 securityContext: '{"runAsUser": 32}'

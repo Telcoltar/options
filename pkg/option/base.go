@@ -130,6 +130,10 @@ func (o *baseOption[T, Self]) JSONSchema() map[string]any {
 	return prop
 }
 
+func (o *baseOption[T, Self]) Name() string {
+	return o.name
+}
+
 // Get returns in order: value, defaultValue, empty Value of Type T
 func (o *baseOption[T, Self]) Get() T {
 	if o.value != nil {
@@ -168,10 +172,6 @@ func (o *baseOption[T, Self]) GetPointer() *T {
 
 func (o *baseOption[T, Self]) StrValue() string {
 	return o.valueFormatFunc(o.Get())
-}
-
-func (o *baseOption[T, Self]) Name() string {
-	return o.name
 }
 
 // IsValid checks if a set value passes all check function

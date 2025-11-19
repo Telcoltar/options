@@ -8,22 +8,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ContainerInterface defines the minimal interface needed for nested containers.
-// This allows different Container[T] types to be stored in the same map.
-type ContainerInterface interface {
-	parseMap(data map[string]any) error
-	JSONSchema() map[string]any
-	GetName() string
-	IsValid() bool
-}
-
 // Container holds a collection of options and nested containers.
 // It provides parsing and JSON Schema generation capabilities.
 // The type parameter T represents the source struct type.
 type Container[T any] struct {
-	Name           string
+	name           string
 	Options        map[string]OptionInterface
-	Containers     map[string]ContainerInterface
 	jsonProperties map[string]any
 	source         *T
 	checks         []func(*T) bool
@@ -32,7 +22,7 @@ type Container[T any] struct {
 // NewContainer creates a new Container with the specified name and collects options from the provided struct.
 func NewContainer[T any](name string, source *T) *Container[T] {
 	oc := Container[T]{
-		Name:           name,
+		name:           name,
 		source:         source,
 		jsonProperties: map[string]any{},
 		checks:         make([]func(*T) bool, 0),
@@ -42,8 +32,8 @@ func NewContainer[T any](name string, source *T) *Container[T] {
 }
 
 // GetName returns the container name, implementing ContainerInterface.
-func (oc *Container[T]) GetName() string {
-	return oc.Name
+func (oc *Container[T]) Name() string {
+	return oc.name
 }
 
 // Check adds a validation check function that receives typed access to the source struct.
@@ -76,19 +66,12 @@ func (oc *Container[T]) IsValid() bool {
 		}
 	}
 
-	// Recursively validate subcontainers
-	for _, container := range oc.Containers {
-		if !container.IsValid() {
-			return false
-		}
-	}
-
 	return true
 }
 
 // Collect gathers options and nested containers from the provided struct.
 func (oc *Container[T]) Collect(s any) {
-	oc.Options, oc.Containers = Collect(s)
+	oc.Options = Collect(s)
 }
 
 // Parse parses YAML data and populates the container's options and nested containers.
@@ -100,17 +83,19 @@ func (oc *Container[T]) Parse(data []byte) error {
 	return oc.parseMap(yamlData)
 }
 
+func (oc *Container[T]) SetAny(data any) error {
+	if dataMap, ok := data.(map[string]any); !ok {
+		return fmt.Errorf("error setting %s, data is not of type map[string]any, but %T", oc.name, data)
+	} else {
+		return oc.parseMap(dataMap)
+	}
+}
+
 func (oc *Container[T]) parseMap(data map[string]any) error {
 	for key, value := range data {
 		if opt, ok := oc.Options[key]; ok {
 			if err := opt.SetAny(value); err != nil {
 				return fmt.Errorf("failed to set option %s: %w", key, err)
-			}
-		} else if container, ok := oc.Containers[key]; ok {
-			if mapValue, ok := value.(map[string]any); ok {
-				if err := container.parseMap(mapValue); err != nil {
-					return fmt.Errorf("failed to parse container %s: %w", key, err)
-				}
 			}
 		}
 	}
@@ -119,9 +104,8 @@ func (oc *Container[T]) parseMap(data map[string]any) error {
 
 // Collect extracts options and nested containers from a struct using reflection.
 // It returns maps of options and containers found in the struct fields.
-func Collect(s any) (map[string]OptionInterface, map[string]ContainerInterface) {
+func Collect(s any) map[string]OptionInterface {
 	resultOptions := make(map[string]OptionInterface)
-	resultContainers := make(map[string]ContainerInterface)
 
 	v := reflect.ValueOf(s)
 	if v.Kind() == reflect.Pointer {
@@ -129,7 +113,7 @@ func Collect(s any) (map[string]OptionInterface, map[string]ContainerInterface) 
 	}
 
 	if v.Kind() != reflect.Struct {
-		return resultOptions, resultContainers
+		return resultOptions
 	}
 
 	for i := 0; i < v.NumField(); i++ {
@@ -140,34 +124,19 @@ func Collect(s any) (map[string]OptionInterface, map[string]ContainerInterface) 
 		}
 
 		fieldValue := field.Interface()
-		if opt, ok := fieldValue.(OptionInterface); ok {
-			resultOptions[opt.Name()] = opt
+		opt, ok := fieldValue.(OptionInterface)
+		if !ok {
 			continue
 		}
 
-		if field.Kind() == reflect.Pointer && !field.IsNil() {
-			elem := field.Elem()
-			if elem.Kind() == reflect.Struct {
-				for j := 0; j < elem.NumField(); j++ {
-					embeddedField := elem.Field(j)
-					if embeddedField.Kind() == reflect.Pointer {
-						if !embeddedField.IsNil() {
-							if !embeddedField.CanInterface() {
-								continue
-							}
-							// Check if it implements ContainerInterface
-							if container, ok := embeddedField.Interface().(ContainerInterface); ok {
-								resultContainers[container.GetName()] = container
-								break
-							}
-						}
-					}
-				}
-			}
+		if field.Kind() == reflect.Pointer && field.IsNil() {
+			continue
 		}
+
+		resultOptions[opt.Name()] = opt
 	}
 
-	return resultOptions, resultContainers
+	return resultOptions
 }
 
 // JSONSchema generates a JSON Schema representation of the container and its contents.
@@ -179,17 +148,13 @@ func (oc *Container[T]) JSONSchema() map[string]any {
 		properties[name] = opt.JSONSchema()
 	}
 
-	for name, container := range oc.Containers {
-		properties[name] = container.JSONSchema()
-	}
-
 	schema := map[string]any{
 		"type":       "object",
 		"properties": properties,
 	}
 
-	if oc.Name != "" {
-		schema["title"] = oc.Name
+	if oc.name != "" {
+		schema["title"] = oc.name
 	}
 
 	// Add any custom JSON properties from Check() calls

@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 
-	"github.com/telcoltar/options/example/grafana"
+	grafana "github.com/telcoltar/options/example/grafana/pkg"
 )
 
 func main() {
@@ -20,7 +21,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	yamlData, err := os.ReadFile("example/test.yaml")
+	yamlPath := filepath.Join("example", "grafana", "test.yaml")
+	yamlData, err := os.ReadFile(yamlPath)
 	if err != nil {
 		log.Fatal("Error reading file:", err)
 	}

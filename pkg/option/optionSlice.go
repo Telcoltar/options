@@ -10,14 +10,19 @@ import (
 type Slice[T any] struct {
 	baseOption[[]T, *Slice[T]]
 	ItemOption *baseOption[T, *Slice[T]]
+	factory    func() T
 }
 
 // NewSlice creates a new Slice option with the specified name.
-func NewSlice[T any](name string) *Slice[T] {
+func NewSlice[T any](name string, factory ...func() T) *Slice[T] {
 	os := &Slice[T]{}
 	os.initCommon(name, os)
-	os.ItemOption = &baseOption[T, *Slice[T]]{}
-	os.ItemOption.initCommon("", os)
+	if len(factory) > 0 {
+		os.factory = factory[0]
+	} else {
+		os.ItemOption = &baseOption[T, *Slice[T]]{}
+		os.ItemOption.initCommon("", os)
+	}
 	return os
 }
 
@@ -59,9 +64,17 @@ func (os *Slice[T]) IsValid() bool {
 	}
 	if os.value != nil {
 		for _, elem := range *os.value {
-			os.ItemOption.Set(elem)
-			if !os.ItemOption.IsValid() {
-				return false
+			if os.factory != nil {
+				if opt, ok := any(elem).(OptionInterface); ok {
+					if !opt.IsValid() {
+						return false
+					}
+				}
+			} else {
+				os.ItemOption.Set(elem)
+				if !os.ItemOption.IsValid() {
+					return false
+				}
 			}
 		}
 	}
@@ -88,11 +101,23 @@ func (os *Slice[T]) SetAny(value any) error {
 	for i := 0; i < sliceValue.Len(); i++ {
 		elem := sliceValue.Index(i).Interface()
 
-		if err := os.ItemOption.SetAny(elem); err != nil {
-			return err
-		}
+		if os.factory != nil {
+			newElem := os.factory()
+			if opt, ok := any(newElem).(OptionInterface); ok {
+				if err := opt.SetAny(elem); err != nil {
+					return err
+				}
+				result[i] = newElem
+			} else {
+				return fmt.Errorf("factory returned type %T which does not implement CommonInterface", newElem)
+			}
+		} else {
+			if err := os.ItemOption.SetAny(elem); err != nil {
+				return err
+			}
 
-		result[i] = os.ItemOption.Get()
+			result[i] = os.ItemOption.Get()
+		}
 	}
 
 	os.Set(result)
@@ -100,7 +125,17 @@ func (os *Slice[T]) SetAny(value any) error {
 }
 
 func (os *Slice[T]) JSONSchema() map[string]any {
-	items := os.ItemOption.JSONSchema()
+	var items map[string]any
+	if os.factory != nil {
+		newElem := os.factory()
+		if opt, ok := any(newElem).(OptionInterface); ok {
+			items = opt.JSONSchema()
+		} else {
+			items = make(map[string]any)
+		}
+	} else {
+		items = os.ItemOption.JSONSchema()
+	}
 
 	property := map[string]any{
 		"type":  "array",

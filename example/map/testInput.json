@@ -1,0 +1,28 @@
+{
+    "$schema": "./schema.json",
+    "data": {
+        "branch1": {
+            "users": [
+                {
+                    "userName": "John Doe",
+                    "age": 2
+                },
+                {
+                    "userName": "John Doeer",
+                    "age": 32
+                }
+            ],
+            "groups": {
+                "admins": [
+                    {
+                        "userName": "John Doe",
+                        "age": 30
+                    }
+                ]
+            }
+        }
+    },
+    "opt": {
+        "mode": "dev"
+    }
+}

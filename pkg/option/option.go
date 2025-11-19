@@ -6,7 +6,6 @@ package option
 type OptionInterface interface {
 	Name() string
 	IsValid() bool
-	StrValue() string
 	SetAny(value any) error
 	JSONSchema() map[string]any
 }

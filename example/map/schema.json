@@ -1,0 +1,67 @@
+{
+  "properties": {
+    "data": {
+      "additionalProperties": {
+        "properties": {
+          "groups": {
+            "additionalProperties": {
+              "items": {
+                "properties": {
+                  "age": {
+                    "type": "integer"
+                  },
+                  "userName": {
+                    "type": "string"
+                  }
+                },
+                "title": "user",
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "type": "object"
+          },
+          "users": {
+            "items": {
+              "properties": {
+                "age": {
+                  "type": "integer"
+                },
+                "userName": {
+                  "type": "string"
+                }
+              },
+              "title": "user",
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "title": "data",
+        "type": "object"
+      },
+      "type": "object"
+    },
+    "opt": {
+      "properties": {
+        "mode": {
+          "enum": [
+            "dev",
+            "prod"
+          ],
+          "type": "string"
+        }
+      },
+      "title": "opt",
+      "type": "object"
+    },
+    "test": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "type": "object"
+    }
+  },
+  "title": "cfg",
+  "type": "object"
+}

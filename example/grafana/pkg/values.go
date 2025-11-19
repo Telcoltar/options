@@ -2,7 +2,7 @@
 package grafana
 
 import (
-	"github.com/telcoltar/options/pkg/option"
+	"github.com/Telcoltar/options/pkg/option"
 
 	corev1 "k8s.io/api/core/v1"
 )

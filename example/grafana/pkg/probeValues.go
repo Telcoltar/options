@@ -1,6 +1,6 @@
 package grafana
 
-import "github.com/telcoltar/options/pkg/option"
+import "github.com/Telcoltar/options/pkg/option"
 
 type ProbeValues struct {
 	InitialDelay     *option.Simple[int32]

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	grafana "github.com/telcoltar/options/example/grafana/pkg"
+	grafana "github.com/Telcoltar/options/example/grafana/pkg"
 )
 
 func main() {

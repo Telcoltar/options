@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/telcoltar/options/pkg/option"
+	"github.com/Telcoltar/options/pkg/option"
 )
 
 type User struct {

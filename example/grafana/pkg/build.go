@@ -3,7 +3,7 @@ package grafana
 import (
 	"maps"
 
-	"github.com/telcoltar/options/pkg/option"
+	"github.com/Telcoltar/options/pkg/option"
 
 	"github.com/Telcoltar/kubernetes-resources/builders"
 	"github.com/Telcoltar/kubernetes-resources/utils"

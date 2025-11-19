@@ -3,7 +3,7 @@ package grafana
 import (
 	"strings"
 
-	"github.com/telcoltar/options/pkg/option"
+	"github.com/Telcoltar/options/pkg/option"
 )
 
 type PersistenceValues struct {

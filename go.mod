@@ -1,4 +1,4 @@
-module github.com/telcoltar/options
+module github.com/Telcoltar/options
 
 go 1.25.0
 

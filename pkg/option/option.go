@@ -7,6 +7,7 @@ type OptionInterface interface {
 	Name() string
 	IsValid() bool
 	SetAny(value any) error
+	GetAny() any
 	JSONSchema() map[string]any
 }
 

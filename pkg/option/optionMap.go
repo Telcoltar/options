@@ -124,3 +124,29 @@ func (om *Map[T]) JSONSchema() map[string]any {
 
 	return property
 }
+
+// GetAny returns the map value as any, or nil if no value is set.
+// If using a factory for nested options, recursively calls GetAny() on each value.
+func (om *Map[T]) GetAny() any {
+	if !om.HasValue() {
+		return nil
+	}
+
+	m := om.Get()
+
+	// If using factory, values are OptionInterface - recurse
+	if om.factory != nil {
+		result := make(map[string]any, len(m))
+		for key, elem := range m {
+			if opt, ok := any(elem).(OptionInterface); ok {
+				result[key] = opt.GetAny()
+			} else {
+				result[key] = elem
+			}
+		}
+		return result
+	}
+
+	// No factory - return the map directly
+	return m
+}

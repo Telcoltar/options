@@ -146,3 +146,29 @@ func (os *Slice[T]) JSONSchema() map[string]any {
 
 	return property
 }
+
+// GetAny returns the slice value as any, or nil if no value is set.
+// If using a factory for nested options, recursively calls GetAny() on each element.
+func (os *Slice[T]) GetAny() any {
+	if !os.HasValue() {
+		return nil
+	}
+
+	slice := os.Get()
+
+	// If using factory, elements are OptionInterface - recurse
+	if os.factory != nil {
+		result := make([]any, len(slice))
+		for i, elem := range slice {
+			if opt, ok := any(elem).(OptionInterface); ok {
+				result[i] = opt.GetAny()
+			} else {
+				result[i] = elem
+			}
+		}
+		return result
+	}
+
+	// No factory - return the slice directly
+	return slice
+}

@@ -170,3 +170,22 @@ func (oc *Container[T]) JSONSchemaWithMetadata() map[string]any {
 	schema["$schema"] = "https://json-schema.org/draft-07/schema"
 	return schema
 }
+
+// ToMap exports the container's options as a map[string]any for unstructured serialization.
+// It calls GetAny() on each option and skips options that return nil (no value set).
+// Nested containers are automatically recursed since they also implement GetAny().
+func (oc *Container[T]) ToMap() map[string]any {
+	result := make(map[string]any)
+	for name, opt := range oc.Options {
+		if value := opt.GetAny(); value != nil {
+			result[name] = value
+		}
+	}
+	return result
+}
+
+// GetAny returns the container's options as map[string]any, implementing OptionInterface.
+// This enables auto-recursion when containers are nested within other containers or slices/maps.
+func (oc *Container[T]) GetAny() any {
+	return oc.ToMap()
+}

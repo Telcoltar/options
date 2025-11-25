@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/Telcoltar/options/pkg/option"
+	"gopkg.in/yaml.v3"
 )
 
 type User struct {
@@ -100,4 +101,14 @@ func main() {
 		}
 	}
 	println(cfg.Opt.Mode.Get())
+
+	// test output
+	rawOutput := cfg.ToMap()
+	if byteOutput, err := yaml.Marshal(rawOutput); err != nil {
+		log.Fatal(err)
+	} else {
+		if err := os.WriteFile("example/map/output.yaml", byteOutput, 0600); err != nil {
+			log.Fatal(err)
+		}
+	}
 }

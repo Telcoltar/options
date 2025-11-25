@@ -270,3 +270,12 @@ func (o *baseOption[T, Self]) SetAny(value any) error {
 	o.Set(converted.Interface().(T))
 	return nil
 }
+
+// GetAny returns the value as any, or nil if no value is set.
+// This respects HasValue() - only returns a value if one is explicitly set or a default exists.
+func (o *baseOption[T, Self]) GetAny() any {
+	if !o.HasValue() {
+		return nil
+	}
+	return o.Get()
+}

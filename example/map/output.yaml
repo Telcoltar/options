@@ -1,0 +1,13 @@
+data:
+    branch1:
+        groups:
+            admins:
+                - age: 30
+                  userName: John Doe
+        users:
+            - age: 2
+              userName: John Doe
+            - age: 32
+              userName: John Doeer
+opt:
+    mode: dev

@@ -3,6 +3,7 @@ package option
 import (
 	"fmt"
 	"maps"
+	"os"
 	"reflect"
 	"strings"
 
@@ -114,6 +115,15 @@ func (oc *Container[T]) ParseAndValidate(data []byte) error {
 	return nil
 }
 
+// ParseAndValidateFile reads data from a file, parses it, and validates the container.
+func (oc *Container[T]) ParseAndValidateFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", path, err)
+	}
+	return oc.ParseAndValidate(data)
+}
+
 func (oc *Container[T]) SetAny(data any) error {
 	if dataMap, ok := data.(map[string]any); !ok {
 		return fmt.Errorf("error setting %s, data is not of type map[string]any, but %T", oc.name, data)
@@ -198,7 +208,7 @@ func (oc *Container[T]) JSONSchema() map[string]any {
 // This produces a complete, standalone JSON Schema document.
 func (oc *Container[T]) JSONSchemaWithMetadata() map[string]any {
 	schema := oc.JSONSchema()
-	schema["$schema"] = "https://json-schema.org/draft-07/schema"
+	schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
 	return schema
 }
 

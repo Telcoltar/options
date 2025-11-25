@@ -75,7 +75,7 @@ func main() {
 	}
 	cfg.Container = option.NewContainer("cfg", cfg)
 
-	jsonSchema := cfg.JSONSchema()
+	jsonSchema := cfg.JSONSchemaWithMetadata()
 	jsonSchemaBytes, err := json.MarshalIndent(jsonSchema, "", "  ")
 	if err != nil {
 		log.Fatal(err)

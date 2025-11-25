@@ -2,6 +2,8 @@ package option
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -36,6 +38,45 @@ port: 3000
 	}
 	if cfg.Port.Get() != 3000 {
 		t.Errorf("Expected port 3000, got %d", cfg.Port.Get())
+	}
+}
+
+func TestContainer_ParseAndValidateFile_Success(t *testing.T) {
+	cfg := newTestConfig()
+	container := NewContainer("test", cfg)
+
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "config.yaml")
+
+	data := []byte(`
+name: fileapp
+port: 4000
+`)
+	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
+		t.Fatalf("Failed to write temp file: %v", err)
+	}
+
+	err := container.ParseAndValidateFile(tmpFile)
+	if err != nil {
+		t.Errorf("ParseAndValidateFile failed: %v", err)
+	}
+
+	if cfg.Name.Get() != "fileapp" {
+		t.Errorf("Expected name 'fileapp', got %q", cfg.Name.Get())
+	}
+	if cfg.Port.Get() != 4000 {
+		t.Errorf("Expected port 4000, got %d", cfg.Port.Get())
+	}
+}
+
+func TestContainer_ParseAndValidateFile_ReadError(t *testing.T) {
+	cfg := newTestConfig()
+	container := NewContainer("test", cfg)
+
+	// Non-existent file
+	err := container.ParseAndValidateFile("non_existent_file.yaml")
+	if err == nil {
+		t.Error("Expected error for non-existent file, got nil")
 	}
 }
 

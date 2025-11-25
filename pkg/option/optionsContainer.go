@@ -4,9 +4,25 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// ValidationError represents a validation failure with details about which options failed.
+// This type is designed to be expanded in the future with more specific error information.
+type ValidationError struct {
+	Container      string
+	InvalidOptions []string
+}
+
+func (e *ValidationError) Error() string {
+	if len(e.InvalidOptions) == 0 {
+		return fmt.Sprintf("validation failed for container %q", e.Container)
+	}
+	return fmt.Sprintf("validation failed for container %q: invalid options: [%s]",
+		e.Container, strings.Join(e.InvalidOptions, ", "))
+}
 
 // Container holds a collection of options and nested containers.
 // It provides parsing and JSON Schema generation capabilities.
@@ -81,6 +97,21 @@ func (oc *Container[T]) Parse(data []byte) error {
 		return fmt.Errorf("failed to unmarshal yaml: %w", err)
 	}
 	return oc.parseMap(yamlData)
+}
+
+// ParseAndValidate parses YAML data and validates the container in one step.
+// Returns a ValidationError if validation fails, allowing inspection of which options failed.
+func (oc *Container[T]) ParseAndValidate(data []byte) error {
+	if err := oc.Parse(data); err != nil {
+		return err
+	}
+	if !oc.IsValid() {
+		return &ValidationError{
+			Container:      oc.name,
+			InvalidOptions: []string{},
+		}
+	}
+	return nil
 }
 
 func (oc *Container[T]) SetAny(data any) error {

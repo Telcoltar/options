@@ -49,7 +49,7 @@ func NewContainer[T any](name string, source *T) *Container[T] {
 }
 
 // GetName returns the container name, implementing ContainerInterface.
-func (oc *Container[T]) Name() string {
+func (oc *Container[T]) GetName() string {
 	return oc.name
 }
 
@@ -174,7 +174,7 @@ func Collect(s any) map[string]OptionInterface {
 			continue
 		}
 
-		resultOptions[opt.Name()] = opt
+		resultOptions[opt.GetName()] = opt
 	}
 
 	return resultOptions

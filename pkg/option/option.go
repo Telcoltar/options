@@ -4,7 +4,7 @@ package option
 // It provides methods for name retrieval, validation, string conversion, setting values,
 // and JSON Schema generation.
 type OptionInterface interface {
-	Name() string
+	GetName() string
 	IsValid() bool
 	SetAny(value any) error
 	GetAny() any

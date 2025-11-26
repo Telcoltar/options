@@ -130,7 +130,7 @@ func (o *baseOption[T, Self]) JSONSchema() map[string]any {
 	return prop
 }
 
-func (o *baseOption[T, Self]) Name() string {
+func (o *baseOption[T, Self]) GetName() string {
 	return o.name
 }
 

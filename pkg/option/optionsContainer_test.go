@@ -205,3 +205,321 @@ func contains(s, substr string) bool {
 	}
 	return false
 }
+
+// Test isSet tracking and JSON Schema-consistent validation behavior
+
+func TestContainer_UnsetNonRequired_WithRequiredChildren_IsValid(t *testing.T) {
+	// JSON Schema behavior: if an object property is not required and not present,
+	// the nested required fields are not validated
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name").Required(),
+	}
+	container := NewContainer("nested", cfg)
+	// Container is not required and not set - should be valid even though child is required
+
+	if !container.IsValid() {
+		t.Error("Unset non-required container with required children should be valid (JSON Schema semantics)")
+	}
+}
+
+func TestContainer_UnsetRequired_IsInvalid(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("required", cfg).Required()
+	// Container is required but not set - should be invalid
+
+	if container.IsValid() {
+		t.Error("Unset required container should be invalid")
+	}
+}
+
+func TestContainer_SetEmpty_NonRequired_IsValid(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	// Parse empty object
+	err := container.Parse([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if !container.IsValid() {
+		t.Error("Set empty non-required container should be valid")
+	}
+}
+
+func TestContainer_SetWithMissingRequiredChildren_IsInvalid(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name").Required(),
+	}
+	container := NewContainer("test", cfg)
+
+	// Parse empty object - container is set but required child is missing
+	err := container.Parse([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if container.IsValid() {
+		t.Error("Set container with missing required children should be invalid")
+	}
+}
+
+func TestContainer_HasValue_UnsetContainer(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	if container.HasValue() {
+		t.Error("Unset container should have HasValue() == false")
+	}
+}
+
+func TestContainer_HasValue_SetContainer(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	err := container.Parse([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if !container.HasValue() {
+		t.Error("Set container (even empty) should have HasValue() == true")
+	}
+}
+
+func TestContainer_NotZero_UnsetContainer(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	if container.NotZero() {
+		t.Error("Unset container should have NotZero() == false")
+	}
+}
+
+func TestContainer_NotZero_SetEmptyContainer(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	err := container.Parse([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if container.NotZero() {
+		t.Error("Set but empty container should have NotZero() == false")
+	}
+}
+
+func TestContainer_NotZero_SetWithValues(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	err := container.Parse([]byte(`name: hello`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	if !container.NotZero() {
+		t.Error("Set container with values should have NotZero() == true")
+	}
+}
+
+func TestContainer_GetAny_UnsetContainer(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	result := container.GetAny()
+	if result != nil {
+		t.Errorf("Unset container GetAny() should return nil, got %v", result)
+	}
+}
+
+func TestContainer_GetAny_SetEmptyContainer(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	err := container.Parse([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	result := container.GetAny()
+	if result == nil {
+		t.Error("Set empty container GetAny() should return empty map, not nil")
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Errorf("GetAny() should return map[string]any, got %T", result)
+	}
+	if len(resultMap) != 0 {
+		t.Errorf("GetAny() for empty container should return empty map, got %v", resultMap)
+	}
+}
+
+func TestContainer_GetAny_SetWithValues(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	err := container.Parse([]byte(`name: hello`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	result := container.GetAny()
+	if result == nil {
+		t.Fatal("Set container GetAny() should not return nil")
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("GetAny() should return map[string]any, got %T", result)
+	}
+	if resultMap["name"] != "hello" {
+		t.Errorf("Expected name='hello', got %v", resultMap["name"])
+	}
+}
+
+func TestContainer_NestedContainer_UnsetParent_WithRequiredNestedChild(t *testing.T) {
+	// Simulates JSON Schema: { "properties": { "nested": { "properties": { "name": {} }, "required": ["name"] } } }
+	// If "nested" is not in input, validation passes (nested.name not validated)
+	type nestedConfig struct {
+		Name *Simple[string]
+	}
+	type parentConfig struct {
+		Nested *Container[nestedConfig]
+	}
+
+	nestedCfg := &nestedConfig{
+		Name: NewSimple[string]("name").Required(),
+	}
+	parentCfg := &parentConfig{
+		Nested: NewContainer("nested", nestedCfg),
+	}
+	parent := NewContainer("parent", parentCfg)
+
+	// Parent not set - nested container not validated
+	if !parent.IsValid() {
+		t.Error("Unset parent with nested required children should be valid (JSON Schema semantics)")
+	}
+}
+
+func TestContainer_NestedContainer_SetParent_UnsetNested_WithRequiredNestedChild(t *testing.T) {
+	// If parent is set but "nested" key is not in input, nested container remains unset
+	type nestedConfig struct {
+		Name *Simple[string]
+	}
+	type parentConfig struct {
+		Nested *Container[nestedConfig]
+	}
+
+	nestedCfg := &nestedConfig{
+		Name: NewSimple[string]("name").Required(),
+	}
+	parentCfg := &parentConfig{
+		Nested: NewContainer("nested", nestedCfg),
+	}
+	parent := NewContainer("parent", parentCfg)
+
+	// Parse parent with no nested key
+	err := parent.Parse([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Parent is set, nested is not set (and not required) - should be valid
+	if !parent.IsValid() {
+		t.Error("Set parent with unset non-required nested container should be valid")
+	}
+}
+
+func TestContainer_NestedContainer_SetParent_SetNestedEmpty_WithRequiredNestedChild(t *testing.T) {
+	// If nested is set to {} but has required child, should fail
+	type nestedConfig struct {
+		Name *Simple[string]
+	}
+	type parentConfig struct {
+		Nested *Container[nestedConfig]
+	}
+
+	nestedCfg := &nestedConfig{
+		Name: NewSimple[string]("name").Required(),
+	}
+	parentCfg := &parentConfig{
+		Nested: NewContainer("nested", nestedCfg),
+	}
+	parent := NewContainer("parent", parentCfg)
+
+	// Parse parent with empty nested object
+	err := parent.Parse([]byte(`nested: {}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	// Nested is set but missing required child - should be invalid
+	if parent.IsValid() {
+		t.Error("Set parent with set nested container missing required child should be invalid")
+	}
+}
+
+func TestContainer_SetAny_SetsIsSet(t *testing.T) {
+	cfg := &struct {
+		Name *Simple[string]
+	}{
+		Name: NewSimple[string]("name"),
+	}
+	container := NewContainer("test", cfg)
+
+	err := container.SetAny(map[string]any{})
+	if err != nil {
+		t.Fatalf("SetAny failed: %v", err)
+	}
+
+	if !container.HasValue() {
+		t.Error("SetAny should set isSet to true")
+	}
+}

@@ -35,6 +35,7 @@ type Container[T any] struct {
 	source         *T
 	checks         []func(*T) bool
 	required       bool
+	isSet          bool
 }
 
 // NewContainer creates a new Container with the specified name and collects options from the provided struct.
@@ -76,13 +77,29 @@ func (oc *Container[T]) Check(check func(*T) bool, prop map[string]any) *Contain
 	return oc
 }
 
-// IsValid checks if all options, checks, and subcontainers are valid.
-// It returns true only if:
-// - All container-level checks return true
-// - All options in the Options map have IsValid() == true
-// - All subcontainers have IsValid() == true
+// IsValid checks if the container is valid according to JSON Schema semantics.
+// It returns true if:
+// - Container is not set, not required, and no child options have values
+// - Container is set and all checks pass and all options are valid
+// It returns false if:
+// - Container is not set but is required
+// - Container is set (or has child values) and any check or option fails validation
 func (oc *Container[T]) IsValid() bool {
-	// Run checks on this container's source
+	// Check if any child option has a value
+	hasChildValues := false
+	for _, opt := range oc.Options {
+		if opt.HasValue() {
+			hasChildValues = true
+			break
+		}
+	}
+
+	// If container was never set and no children have values, only fail if required
+	if !oc.isSet && !hasChildValues {
+		return !oc.required
+	}
+
+	// Container is set or has child values - run checks on this container's source
 	for _, check := range oc.checks {
 		if !check(oc.source) {
 			return false
@@ -146,6 +163,7 @@ func (oc *Container[T]) SetAny(data any) error {
 }
 
 func (oc *Container[T]) parseMap(data map[string]any) error {
+	oc.isSet = true
 	for key, value := range data {
 		if opt, ok := oc.Options[key]; ok {
 			if err := opt.SetAny(value); err != nil {
@@ -247,7 +265,25 @@ func (oc *Container[T]) ToMap() map[string]any {
 }
 
 // GetAny returns the container's options as map[string]any, implementing OptionInterface.
+// Returns nil if the container was never set (no input received).
 // This enables auto-recursion when containers are nested within other containers or slices/maps.
 func (oc *Container[T]) GetAny() any {
+	if !oc.isSet {
+		return nil
+	}
 	return oc.ToMap()
+}
+
+// HasValue returns true if the container has been set (received input via SetAny/Parse).
+// This distinguishes between "never received input" and "received empty object {}".
+func (oc *Container[T]) HasValue() bool {
+	return oc.isSet
+}
+
+// NotZero returns true if the container has been set and contains at least one non-nil option value.
+func (oc *Container[T]) NotZero() bool {
+	if !oc.isSet {
+		return false
+	}
+	return len(oc.ToMap()) > 0
 }

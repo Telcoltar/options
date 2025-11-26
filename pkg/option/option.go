@@ -10,6 +10,10 @@ type OptionInterface interface {
 	SetAny(value any) error
 	GetAny() any
 	JSONSchema() map[string]any
+	// HasValue returns true if the option has a value (either explicitly set or via default).
+	HasValue() bool
+	// NotZero returns true if the option has a value and that value is not the zero value.
+	NotZero() bool
 }
 
 type TypedOptionInterface[T any] interface {

@@ -242,6 +242,12 @@ func (o *baseOption[T, Self]) Enum(allowedValues ...T) Self {
 	return o.self
 }
 
+// Description sets a description for the option, used in JSON Schema generation.
+func (o *baseOption[T, Self]) Description(desc string) Self {
+	o.jsonSchemaProperties["description"] = desc
+	return o.self
+}
+
 // Required marks this option as required. Required options must have a value
 // (either explicitly set or via default) for IsValid() to return true.
 func (o *baseOption[T, Self]) Required() Self {

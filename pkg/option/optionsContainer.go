@@ -67,6 +67,12 @@ func (oc *Container[T]) IsRequired() bool {
 	return oc.required
 }
 
+// Description sets a description for the container, used in JSON Schema generation.
+func (oc *Container[T]) Description(desc string) *Container[T] {
+	oc.jsonProperties["description"] = desc
+	return oc
+}
+
 // Check adds a validation check function that receives typed access to the source struct.
 // The check function should return true if validation passes, false otherwise.
 // The prop parameter should contain JSON Schema properties that reflect the same validation

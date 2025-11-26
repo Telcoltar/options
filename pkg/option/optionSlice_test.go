@@ -104,22 +104,6 @@ func TestOptionSlice_SetAny_InvalidType(t *testing.T) {
 	}
 }
 
-func TestOptionSlice_InnerChecks(t *testing.T) {
-	opt := NewSlice[int]("test").InnerChecks(func(val int) bool {
-		return val > 0
-	})
-
-	opt.Set([]int{1, 2, 3})
-	if !opt.IsValid() {
-		t.Error("Expected valid for all positive values")
-	}
-
-	opt.Set([]int{1, -1, 3})
-	if opt.IsValid() {
-		t.Error("Expected invalid for negative value")
-	}
-}
-
 func TestOptionSlice_Enum_ValidValues(t *testing.T) {
 	opt := NewSlice[string]("test").ItemOption.Enum("IPv4", "IPv6")
 	opt.Set([]string{"IPv4", "IPv6"})

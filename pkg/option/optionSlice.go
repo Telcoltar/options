@@ -26,35 +26,6 @@ func NewSlice[T any](name string, factory ...func() T) *Slice[T] {
 	return os
 }
 
-// InnerTransform applies a transform to each element inside the slice on Set.
-func (os *Slice[T]) InnerTransform(transform func(val T) T) *Slice[T] {
-	os.transform = func(s []T) []T {
-		if s == nil {
-			return nil
-		}
-		res := make([]T, len(s))
-		for i, v := range s {
-			res[i] = transform(v)
-		}
-		return res
-	}
-	return os
-}
-
-func (os *Slice[T]) InnerChecks(checks ...func(val T) bool) *Slice[T] {
-	for _, check := range checks {
-		os.checks = append(os.checks, func(val []T) bool {
-			for _, elem := range val {
-				if !check(elem) {
-					return false
-				}
-			}
-			return true
-		})
-	}
-	return os
-}
-
 // IsValid checks if a set value passes all check function
 // if no value is set, but a defaultValue return true
 // if neither is set, return false

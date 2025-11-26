@@ -34,6 +34,7 @@ type Container[T any] struct {
 	jsonProperties map[string]any
 	source         *T
 	checks         []func(*T) bool
+	transform      func(*T)
 	required       bool
 	isSet          bool
 }
@@ -80,6 +81,14 @@ func (oc *Container[T]) Description(desc string) *Container[T] {
 func (oc *Container[T]) Check(check func(*T) bool, prop map[string]any) *Container[T] {
 	maps.Copy(oc.jsonProperties, prop)
 	oc.checks = append(oc.checks, check)
+	return oc
+}
+
+// Transform sets a transformation function that will be applied to the source struct
+// after parsing. The transformation receives a pointer to the source struct and can
+// modify it in place. This is useful for normalizing values or computing derived fields.
+func (oc *Container[T]) Transform(transform func(*T)) *Container[T] {
+	oc.transform = transform
 	return oc
 }
 
@@ -176,6 +185,9 @@ func (oc *Container[T]) parseMap(data map[string]any) error {
 				return fmt.Errorf("failed to set option %s: %w", key, err)
 			}
 		}
+	}
+	if oc.transform != nil {
+		oc.transform(oc.source)
 	}
 	return nil
 }

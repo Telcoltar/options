@@ -6,6 +6,7 @@ package option
 type OptionInterface interface {
 	GetName() string
 	IsValid() bool
+	IsRequired() bool
 	SetAny(value any) error
 	GetAny() any
 	JSONSchema() map[string]any

@@ -34,6 +34,7 @@ type Container[T any] struct {
 	jsonProperties map[string]any
 	source         *T
 	checks         []func(*T) bool
+	required       bool
 }
 
 // NewContainer creates a new Container with the specified name and collects options from the provided struct.
@@ -51,6 +52,18 @@ func NewContainer[T any](name string, source *T) *Container[T] {
 // GetName returns the container name, implementing ContainerInterface.
 func (oc *Container[T]) GetName() string {
 	return oc.name
+}
+
+// Required marks this container as required by its parent container.
+// Required containers must have at least one value set for IsValid() to pass.
+func (oc *Container[T]) Required() *Container[T] {
+	oc.required = true
+	return oc
+}
+
+// IsRequired returns true if this container is marked as required.
+func (oc *Container[T]) IsRequired() bool {
+	return oc.required
 }
 
 // Check adds a validation check function that receives typed access to the source struct.
@@ -184,14 +197,22 @@ func Collect(s any) map[string]OptionInterface {
 // It recursively includes schemas for all options and nested containers.
 func (oc *Container[T]) JSONSchema() map[string]any {
 	properties := make(map[string]any)
+	requiredFields := make([]string, 0)
 
 	for name, opt := range oc.Options {
 		properties[name] = opt.JSONSchema()
+		if opt.IsRequired() {
+			requiredFields = append(requiredFields, name)
+		}
 	}
 
 	schema := map[string]any{
 		"type":       "object",
 		"properties": properties,
+	}
+
+	if len(requiredFields) > 0 {
+		schema["required"] = requiredFields
 	}
 
 	if oc.name != "" {

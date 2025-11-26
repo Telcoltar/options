@@ -242,6 +242,18 @@ func (o *baseOption[T, Self]) Enum(allowedValues ...T) Self {
 	return o.self
 }
 
+// Required marks this option as required. Required options must have a value
+// (either explicitly set or via default) for IsValid() to return true.
+func (o *baseOption[T, Self]) Required() Self {
+	o.required = true
+	return o.self
+}
+
+// IsRequired returns true if this option is marked as required.
+func (o *baseOption[T, Self]) IsRequired() bool {
+	return o.required
+}
+
 func (o *baseOption[T, Self]) Set(value T) {
 	if o.transform != nil {
 		value = o.transform(value)

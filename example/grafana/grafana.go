@@ -31,8 +31,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if !ghv.IsValid() {
-		log.Fatal("not valid, exiting")
+	validation := ghv.Validate("")
+	if validation.HasErrors() {
+		log.Fatalf("not valid, %s", validation)
 	}
 
 	log.Println("Build resources")

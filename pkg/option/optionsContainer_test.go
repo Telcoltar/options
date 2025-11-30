@@ -91,10 +91,10 @@ func TestContainer_ParseAndValidate_ParseError(t *testing.T) {
 		t.Error("Expected parse error, got nil")
 	}
 
-	// Should not be a ValidationError
-	var validationErr *ValidationError
+	// Should not be a ValidationErrors
+	var validationErr *ValidationErrors
 	if errors.As(err, &validationErr) {
-		t.Error("Expected parse error, not ValidationError")
+		t.Error("Expected parse error, not ValidationErrors")
 	}
 }
 
@@ -102,7 +102,12 @@ func TestContainer_ParseAndValidate_ValidationError_CheckFailed(t *testing.T) {
 	cfg := &struct {
 		Value *Simple[int]
 	}{
-		Value: NewSimple[int]("value").Checks(func(v int) bool { return v > 0 }),
+		Value: NewSimple[int]("value").Checks(func(v int) string {
+			if v > 0 {
+				return ""
+			}
+			return "value must be positive"
+		}),
 	}
 	container := NewContainer("test", cfg)
 
@@ -113,9 +118,9 @@ func TestContainer_ParseAndValidate_ValidationError_CheckFailed(t *testing.T) {
 		t.Error("Expected validation error, got nil")
 	}
 
-	var validationErr *ValidationError
+	var validationErr *ValidationErrors
 	if !errors.As(err, &validationErr) {
-		t.Fatalf("Expected ValidationError, got %T: %v", err, err)
+		t.Fatalf("Expected ValidationErrors, got %T: %v", err, err)
 	}
 }
 
@@ -134,9 +139,9 @@ func TestContainer_ParseAndValidate_ValidationError_EnumFailed(t *testing.T) {
 		t.Error("Expected validation error, got nil")
 	}
 
-	var validationErr *ValidationError
+	var validationErr *ValidationErrors
 	if !errors.As(err, &validationErr) {
-		t.Fatalf("Expected ValidationError, got %T: %v", err, err)
+		t.Fatalf("Expected ValidationErrors, got %T: %v", err, err)
 	}
 }
 
@@ -145,8 +150,18 @@ func TestContainer_ParseAndValidate_ValidationError_MultipleInvalid(t *testing.T
 		A *Simple[int]
 		B *Simple[int]
 	}{
-		A: NewSimple[int]("a").Checks(func(v int) bool { return v > 0 }),
-		B: NewSimple[int]("b").Checks(func(v int) bool { return v > 0 }),
+		A: NewSimple[int]("a").Checks(func(v int) string {
+			if v > 0 {
+				return ""
+			}
+			return "value must be positive"
+		}),
+		B: NewSimple[int]("b").Checks(func(v int) string {
+			if v > 0 {
+				return ""
+			}
+			return "value must be positive"
+		}),
 	}
 	container := NewContainer("test", cfg)
 
@@ -160,27 +175,42 @@ b: -2
 		t.Error("Expected validation error, got nil")
 	}
 
-	var validationErr *ValidationError
+	var validationErr *ValidationErrors
 	if !errors.As(err, &validationErr) {
-		t.Fatalf("Expected ValidationError, got %T: %v", err, err)
+		t.Fatalf("Expected ValidationErrors, got %T: %v", err, err)
+	}
+
+	// With the new system, both errors should be collected
+	if len(validationErr.Errors) != 2 {
+		t.Errorf("Expected 2 validation errors, got %d: %v", len(validationErr.Errors), validationErr)
 	}
 }
 
-func TestValidationError_Error(t *testing.T) {
+func TestValidationErrors_Error(t *testing.T) {
 	tests := []struct {
 		name     string
-		err      *ValidationError
+		err      *ValidationErrors
 		contains string
 	}{
 		{
-			name:     "no invalid options",
-			err:      &ValidationError{Container: "test"},
-			contains: `validation failed for container "test"`,
+			name:     "no errors",
+			err:      NewValidationErrors(),
+			contains: "validation passed",
 		},
 		{
-			name:     "with invalid options (currently unused)",
-			err:      &ValidationError{Container: "test", InvalidOptions: []string{}},
-			contains: `validation failed for container "test"`,
+			name: "single error",
+			err: &ValidationErrors{Errors: []FieldError{
+				{Path: "$.value", Message: "required field is missing"},
+			}},
+			contains: "$.value: required field is missing",
+		},
+		{
+			name: "multiple errors",
+			err: &ValidationErrors{Errors: []FieldError{
+				{Path: "$.a", Message: "value must be positive"},
+				{Path: "$.b", Message: "value must be positive"},
+			}},
+			contains: "validation failed with 2 errors",
 		},
 	}
 
@@ -521,5 +551,332 @@ func TestContainer_SetAny_SetsIsSet(t *testing.T) {
 
 	if !container.HasValue() {
 		t.Error("SetAny should set isSet to true")
+	}
+}
+
+// Tests for ValidationErrors and JSONPath collection
+
+func TestValidate_SimpleField_ReturnsPathInError(t *testing.T) {
+	cfg := &struct {
+		Port *Int[int]
+	}{
+		Port: NewInt[int]("port").Maximum(65535),
+	}
+	container := NewContainer("config", cfg)
+
+	err := container.Parse([]byte(`port: 70000`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := container.Validate("$")
+	if !errs.HasErrors() {
+		t.Fatal("Expected validation error")
+	}
+
+	if len(errs.Errors) != 1 {
+		t.Fatalf("Expected 1 error, got %d", len(errs.Errors))
+	}
+
+	if errs.Errors[0].Path != "$.port" {
+		t.Errorf("Expected path '$.port', got %q", errs.Errors[0].Path)
+	}
+}
+
+func TestValidate_NestedContainer_ReturnsNestedPath(t *testing.T) {
+	type serverConfig struct {
+		Port *Int[int]
+	}
+	type rootConfig struct {
+		Server *Container[serverConfig]
+	}
+
+	serverCfg := &serverConfig{
+		Port: NewInt[int]("port").Maximum(65535),
+	}
+	rootCfg := &rootConfig{
+		Server: NewContainer("server", serverCfg),
+	}
+	container := NewContainer("root", rootCfg)
+
+	err := container.Parse([]byte(`
+server:
+  port: 70000
+`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := container.Validate("$")
+	if !errs.HasErrors() {
+		t.Fatal("Expected validation error")
+	}
+
+	if len(errs.Errors) != 1 {
+		t.Fatalf("Expected 1 error, got %d", len(errs.Errors))
+	}
+
+	if errs.Errors[0].Path != "$.server.port" {
+		t.Errorf("Expected path '$.server.port', got %q", errs.Errors[0].Path)
+	}
+}
+
+func TestValidate_Slice_ReturnsIndexInPath(t *testing.T) {
+	cfg := &struct {
+		Ports *Slice[int]
+	}{
+		Ports: NewSlice[int]("ports"),
+	}
+	cfg.Ports.ItemOption.Checks(func(v int) string {
+		if v > 0 && v <= 65535 {
+			return ""
+		}
+		return "port must be between 1 and 65535"
+	})
+
+	container := NewContainer("config", cfg)
+
+	err := container.Parse([]byte(`
+ports:
+  - 8080
+  - -1
+  - 70000
+`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := container.Validate("$")
+	if !errs.HasErrors() {
+		t.Fatal("Expected validation errors")
+	}
+
+	if len(errs.Errors) != 2 {
+		t.Fatalf("Expected 2 errors, got %d: %v", len(errs.Errors), errs)
+	}
+
+	// Check that both invalid items are reported with correct paths
+	paths := make(map[string]bool)
+	for _, e := range errs.Errors {
+		paths[e.Path] = true
+	}
+
+	if !paths["$.ports[1]"] {
+		t.Error("Expected error for $.ports[1]")
+	}
+	if !paths["$.ports[2]"] {
+		t.Error("Expected error for $.ports[2]")
+	}
+}
+
+func TestValidate_Map_ReturnsKeyInPath(t *testing.T) {
+	cfg := &struct {
+		Settings *Map[int]
+	}{
+		Settings: NewMap[int]("settings"),
+	}
+	cfg.Settings.ValueOption.Checks(func(v int) string {
+		if v >= 0 {
+			return ""
+		}
+		return "value must be non-negative"
+	})
+
+	container := NewContainer("config", cfg)
+
+	err := container.Parse([]byte(`
+settings:
+  timeout: 30
+  retries: -1
+  maxConnections: -5
+`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := container.Validate("$")
+	if !errs.HasErrors() {
+		t.Fatal("Expected validation errors")
+	}
+
+	if len(errs.Errors) != 2 {
+		t.Fatalf("Expected 2 errors, got %d: %v", len(errs.Errors), errs)
+	}
+
+	// Check that both invalid items are reported with correct paths
+	paths := make(map[string]bool)
+	for _, e := range errs.Errors {
+		paths[e.Path] = true
+	}
+
+	if !paths["$.settings.retries"] {
+		t.Error("Expected error for $.settings.retries")
+	}
+	if !paths["$.settings.maxConnections"] {
+		t.Error("Expected error for $.settings.maxConnections")
+	}
+}
+
+func TestValidate_SliceOfContainers_ReturnsFullPath(t *testing.T) {
+	type userConfig struct {
+		Email *String
+		Age   *Int[int]
+		*Container[userConfig]
+	}
+
+	newUserConfig := func() *userConfig {
+		u := &userConfig{
+			Email: NewString("email").Required(),
+			Age:   NewInt[int]("age").Minimum(0).Maximum(150),
+		}
+		u.Container = NewContainer("user", u)
+		return u
+	}
+
+	cfg := &struct {
+		Users *Slice[*userConfig]
+	}{
+		Users: NewSlice[*userConfig]("users", newUserConfig),
+	}
+
+	container := NewContainer("config", cfg)
+
+	err := container.Parse([]byte(`
+users:
+  - email: "alice@example.com"
+    age: 25
+  - age: 200
+  - email: "bob@example.com"
+    age: -5
+`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := container.Validate("$")
+	if !errs.HasErrors() {
+		t.Fatal("Expected validation errors")
+	}
+
+	// Should have 3 errors:
+	// - $.users[1].email: required
+	// - $.users[1].age: exceeds max
+	// - $.users[2].age: below min
+	if len(errs.Errors) != 3 {
+		t.Fatalf("Expected 3 errors, got %d: %v", len(errs.Errors), errs)
+	}
+
+	paths := make(map[string]bool)
+	for _, e := range errs.Errors {
+		paths[e.Path] = true
+	}
+
+	if !paths["$.users[1].email"] {
+		t.Error("Expected error for $.users[1].email")
+	}
+	if !paths["$.users[1].age"] {
+		t.Error("Expected error for $.users[1].age")
+	}
+	if !paths["$.users[2].age"] {
+		t.Error("Expected error for $.users[2].age")
+	}
+}
+
+func TestValidate_CollectsAllErrors_NotJustFirst(t *testing.T) {
+	cfg := &struct {
+		A *Int[int]
+		B *Int[int]
+		C *Int[int]
+	}{
+		A: NewInt[int]("a").Minimum(0),
+		B: NewInt[int]("b").Minimum(0),
+		C: NewInt[int]("c").Minimum(0),
+	}
+
+	container := NewContainer("config", cfg)
+
+	err := container.Parse([]byte(`
+a: -1
+b: -2
+c: -3
+`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := container.Validate("$")
+
+	// All 3 errors should be collected
+	if len(errs.Errors) != 3 {
+		t.Errorf("Expected 3 errors, got %d: %v", len(errs.Errors), errs)
+	}
+}
+
+func TestValidate_RequiredField_IncludesDescriptiveMessage(t *testing.T) {
+	cfg := &struct {
+		Name *String
+	}{
+		Name: NewString("name").Required(),
+	}
+
+	container := NewContainer("config", cfg)
+
+	err := container.Parse([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := container.Validate("$")
+	if !errs.HasErrors() {
+		t.Fatal("Expected validation error")
+	}
+
+	if errs.Errors[0].Path != "$.name" {
+		t.Errorf("Expected path '$.name', got %q", errs.Errors[0].Path)
+	}
+
+	if !contains(errs.Errors[0].Message, "required") {
+		t.Errorf("Expected message to contain 'required', got %q", errs.Errors[0].Message)
+	}
+}
+
+func TestValidate_ContainerCheck_ReturnsErrorMessage(t *testing.T) {
+	type rangeConfig struct {
+		Min *Int[int]
+		Max *Int[int]
+		*Container[rangeConfig]
+	}
+
+	cfg := &rangeConfig{
+		Min: NewInt[int]("min"),
+		Max: NewInt[int]("max"),
+	}
+	cfg.Container = NewContainer("range", cfg)
+	cfg.Container.Check(func(r *rangeConfig) string {
+		if r.Min.HasValue() && r.Max.HasValue() && r.Min.Get() > r.Max.Get() {
+			return "min must be less than or equal to max"
+		}
+		return ""
+	}, nil)
+
+	err := cfg.Container.Parse([]byte(`
+min: 10
+max: 5
+`))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+
+	errs := cfg.Container.Validate("$")
+	if !errs.HasErrors() {
+		t.Fatal("Expected validation error")
+	}
+
+	if errs.Errors[0].Path != "$" {
+		t.Errorf("Expected path '$', got %q", errs.Errors[0].Path)
+	}
+
+	if !contains(errs.Errors[0].Message, "min must be less than or equal to max") {
+		t.Errorf("Expected specific error message, got %q", errs.Errors[0].Message)
 	}
 }

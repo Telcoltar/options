@@ -30,26 +30,34 @@ func NewSlice[T any](name string, factory ...func() T) *Slice[T] {
 // if no value is set, but a defaultValue return true
 // if neither is set, return false
 func (os *Slice[T]) IsValid() bool {
-	if !os.baseOption.IsValid() {
-		return false
-	}
+	return !os.Validate("$").HasErrors()
+}
+
+// Validate performs validation and returns all errors with their JSONPath locations.
+// The path parameter is the JSONPath prefix for this option (e.g., "$.items" or "$").
+func (os *Slice[T]) Validate(path string) *ValidationErrors {
+	errs := NewValidationErrors()
+
+	// Validate base option (required check, custom checks on the slice itself)
+	baseErrs := os.baseOption.Validate(path)
+	errs.Merge(baseErrs, "")
+
 	if os.value != nil {
-		for _, elem := range *os.value {
+		for i, elem := range *os.value {
+			elemPath := JoinPath(path, IndexPath(i))
 			if os.factory != nil {
 				if opt, ok := any(elem).(OptionInterface); ok {
-					if !opt.IsValid() {
-						return false
-					}
+					elemErrs := opt.Validate(elemPath)
+					errs.Merge(elemErrs, "")
 				}
 			} else {
 				os.ItemOption.Set(elem)
-				if !os.ItemOption.IsValid() {
-					return false
-				}
+				elemErrs := os.ItemOption.Validate(elemPath)
+				errs.Merge(elemErrs, "")
 			}
 		}
 	}
-	return true
+	return errs
 }
 
 func (os *Slice[T]) EmptyDefault() *Slice[T] {

@@ -1,5 +1,7 @@
 package option
 
+import "fmt"
+
 // Float constraint interface for all floating-point types
 type Float interface {
 	~float32 | ~float64
@@ -21,8 +23,11 @@ func NewNumber[T Float](name string) *Number[T] {
 // Minimum sets the minimum allowed value for the number option.
 // It adds both a validation check and the corresponding JSON schema property.
 func (o *Number[T]) Minimum(min T) *Number[T] {
-	o.Check(func(value T) bool {
-		return value >= min
+	o.Check(func(value T) string {
+		if value >= min {
+			return ""
+		}
+		return fmt.Sprintf("value %v is less than minimum %v", value, min)
 	}, map[string]any{"minimum": min})
 	return o
 }
@@ -30,8 +35,11 @@ func (o *Number[T]) Minimum(min T) *Number[T] {
 // Maximum sets the maximum allowed value for the number option.
 // It adds both a validation check and the corresponding JSON schema property.
 func (o *Number[T]) Maximum(max T) *Number[T] {
-	o.Check(func(value T) bool {
-		return value <= max
+	o.Check(func(value T) string {
+		if value <= max {
+			return ""
+		}
+		return fmt.Sprintf("value %v exceeds maximum %v", value, max)
 	}, map[string]any{"maximum": max})
 	return o
 }

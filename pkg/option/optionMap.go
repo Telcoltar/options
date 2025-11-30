@@ -34,26 +34,34 @@ func (om *Map[T]) EmptyDefault() *Map[T] {
 // if no value is set, but a defaultValue return true
 // if neither is set, return false
 func (om *Map[T]) IsValid() bool {
-	if !om.baseOption.IsValid() {
-		return false
-	}
+	return !om.Validate("$").HasErrors()
+}
+
+// Validate performs validation and returns all errors with their JSONPath locations.
+// The path parameter is the JSONPath prefix for this option (e.g., "$.config" or "$").
+func (om *Map[T]) Validate(path string) *ValidationErrors {
+	errs := NewValidationErrors()
+
+	// Validate base option (required check, custom checks on the map itself)
+	baseErrs := om.baseOption.Validate(path)
+	errs.Merge(baseErrs, "")
+
 	if om.value != nil {
-		for _, elem := range *om.value {
+		for key, elem := range *om.value {
+			elemPath := JoinPath(path, KeyPath(key))
 			if om.factory != nil {
 				if opt, ok := any(elem).(OptionInterface); ok {
-					if !opt.IsValid() {
-						return false
-					}
+					elemErrs := opt.Validate(elemPath)
+					errs.Merge(elemErrs, "")
 				}
 			} else {
 				om.ValueOption.Set(elem)
-				if !om.ValueOption.IsValid() {
-					return false
-				}
+				elemErrs := om.ValueOption.Validate(elemPath)
+				errs.Merge(elemErrs, "")
 			}
 		}
 	}
-	return true
+	return errs
 }
 
 func (om *Map[T]) SetAny(value any) error {

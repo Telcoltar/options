@@ -14,6 +14,9 @@ type OptionInterface interface {
 	HasValue() bool
 	// NotZero returns true if the option has a value and that value is not the zero value.
 	NotZero() bool
+	// Validate performs validation and returns all errors with their JSONPath locations.
+	// The path parameter is the JSONPath prefix for this option (e.g., "$.config" or "$").
+	Validate(path string) *ValidationErrors
 }
 
 type TypedOptionInterface[T any] interface {

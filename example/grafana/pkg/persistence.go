@@ -36,13 +36,13 @@ func NewPersistenceValues() *PersistenceValues {
 
 	pv.Container = option.NewContainer("persistence", pv)
 
-	pv.Check(func(pv *PersistenceValues) bool {
+	pv.Check(func(pv *PersistenceValues) string {
 		if pv.Enabled.Get() {
 			if !pv.Size.HasValue() {
-				return false
+				return "size is required when persistence is enabled"
 			}
 		}
-		return true
+		return ""
 	},
 		map[string]any{
 			"if": map[string]any{

@@ -1,5 +1,7 @@
 package option
 
+import "fmt"
+
 // Integer constraint interface for all integer types
 type Integer interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64 |
@@ -22,8 +24,11 @@ func NewInt[T Integer](name string) *Int[T] {
 // Minimum sets the minimum allowed value for the integer option.
 // It adds both a validation check and the corresponding JSON schema property.
 func (o *Int[T]) Minimum(min T) *Int[T] {
-	o.Check(func(value T) bool {
-		return value >= min
+	o.Check(func(value T) string {
+		if value >= min {
+			return ""
+		}
+		return fmt.Sprintf("value %v is less than minimum %v", value, min)
 	}, map[string]any{"minimum": min})
 	return o
 }
@@ -31,8 +36,11 @@ func (o *Int[T]) Minimum(min T) *Int[T] {
 // Maximum sets the maximum allowed value for the integer option.
 // It adds both a validation check and the corresponding JSON schema property.
 func (o *Int[T]) Maximum(max T) *Int[T] {
-	o.Check(func(value T) bool {
-		return value <= max
+	o.Check(func(value T) string {
+		if value <= max {
+			return ""
+		}
+		return fmt.Sprintf("value %v exceeds maximum %v", value, max)
 	}, map[string]any{"maximum": max})
 	return o
 }

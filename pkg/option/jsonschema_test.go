@@ -436,11 +436,11 @@ func TestContainerCheckWithIfElseSchema(t *testing.T) {
 	// - In non-production: minReplicas >= 1
 	// - Always: minReplicas < maxReplicas
 	config.Container.Check(
-		func(d *DeploymentConfig) bool {
+		func(d *DeploymentConfig) string {
 			// Validate minReplicas < maxReplicas
 			if d.MinReplicas.HasValue() && d.MaxReplicas.HasValue() {
 				if d.MinReplicas.Get() >= d.MaxReplicas.Get() {
-					return false
+					return "minReplicas must be less than maxReplicas"
 				}
 			}
 
@@ -450,20 +450,20 @@ func TestContainerCheckWithIfElseSchema(t *testing.T) {
 				if env == "prod" {
 					// Production requires higher minimums
 					if d.MinReplicas.HasValue() && d.MinReplicas.Get() < 3 {
-						return false
+						return "production requires minReplicas >= 3"
 					}
 					if d.MaxReplicas.HasValue() && d.MaxReplicas.Get() < 10 {
-						return false
+						return "production requires maxReplicas >= 10"
 					}
 				} else {
 					// Non-production requires at least 1 replica
 					if d.MinReplicas.HasValue() && d.MinReplicas.Get() < 1 {
-						return false
+						return "non-production requires minReplicas >= 1"
 					}
 				}
 			}
 
-			return true
+			return ""
 		},
 		// JSON Schema that reflects the SAME validation logic
 		map[string]any{

@@ -5,25 +5,13 @@ import (
 	"maps"
 	"os"
 	"reflect"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-// ValidationError represents a validation failure with details about which options failed.
-// This type is designed to be expanded in the future with more specific error information.
-type ValidationError struct {
-	Container      string
-	InvalidOptions []string
-}
-
-func (e *ValidationError) Error() string {
-	if len(e.InvalidOptions) == 0 {
-		return fmt.Sprintf("validation failed for container %q", e.Container)
-	}
-	return fmt.Sprintf("validation failed for container %q: invalid options: [%s]",
-		e.Container, strings.Join(e.InvalidOptions, ", "))
-}
+// ContainerCheckFunc is a validation check for containers that returns an error message if validation fails.
+// Return empty string if validation passes.
+type ContainerCheckFunc[T any] func(*T) string
 
 // Container holds a collection of options and nested containers.
 // It provides parsing and JSON Schema generation capabilities.
@@ -33,7 +21,7 @@ type Container[T any] struct {
 	Options        map[string]OptionInterface
 	jsonProperties map[string]any
 	source         *T
-	checks         []func(*T) bool
+	checks         []ContainerCheckFunc[T]
 	transform      func(*T)
 	required       bool
 	isSet          bool
@@ -45,7 +33,7 @@ func NewContainer[T any](name string, source *T) *Container[T] {
 		name:           name,
 		source:         source,
 		jsonProperties: map[string]any{},
-		checks:         make([]func(*T) bool, 0),
+		checks:         make([]ContainerCheckFunc[T], 0),
 	}
 	oc.Collect(source)
 	return &oc
@@ -75,10 +63,10 @@ func (oc *Container[T]) Description(desc string) *Container[T] {
 }
 
 // Check adds a validation check function that receives typed access to the source struct.
-// The check function should return true if validation passes, false otherwise.
+// The check function should return an empty string if validation passes, or an error message if it fails.
 // The prop parameter should contain JSON Schema properties that reflect the same validation
 // logic as the check function, allowing external tools to validate the same constraints.
-func (oc *Container[T]) Check(check func(*T) bool, prop map[string]any) *Container[T] {
+func (oc *Container[T]) Check(check ContainerCheckFunc[T], prop map[string]any) *Container[T] {
 	maps.Copy(oc.jsonProperties, prop)
 	oc.checks = append(oc.checks, check)
 	return oc
@@ -100,6 +88,18 @@ func (oc *Container[T]) Transform(transform func(*T)) *Container[T] {
 // - Container is not set but is required
 // - Container is set (or has child values) and any check or option fails validation
 func (oc *Container[T]) IsValid() bool {
+	return !oc.Validate("$").HasErrors()
+}
+
+// Validate performs validation and returns all errors with their JSONPath locations.
+// The path parameter is the JSONPath prefix for this container (e.g., "$.config" or "$").
+func (oc *Container[T]) Validate(path string) *ValidationErrors {
+	// set default path to root $
+	if path == "" {
+		path = "$"
+	}
+	errs := NewValidationErrors()
+
 	// Check if any child option has a value
 	hasChildValues := false
 	for _, opt := range oc.Options {
@@ -111,24 +111,27 @@ func (oc *Container[T]) IsValid() bool {
 
 	// If container was never set and no children have values, only fail if required
 	if !oc.isSet && !hasChildValues {
-		return !oc.required
+		if oc.required {
+			errs.Add(path, "required container is missing")
+		}
+		return errs
 	}
 
 	// Container is set or has child values - run checks on this container's source
 	for _, check := range oc.checks {
-		if !check(oc.source) {
-			return false
+		if msg := check(oc.source); msg != "" {
+			errs.Add(path, msg)
 		}
 	}
 
 	// Check all options are valid
-	for _, opt := range oc.Options {
-		if !opt.IsValid() {
-			return false
-		}
+	for name, opt := range oc.Options {
+		optPath := JoinPath(path, name)
+		optErrs := opt.Validate(optPath)
+		errs.Merge(optErrs, "")
 	}
 
-	return true
+	return errs
 }
 
 // Collect gathers options and nested containers from the provided struct.
@@ -146,18 +149,12 @@ func (oc *Container[T]) Parse(data []byte) error {
 }
 
 // ParseAndValidate parses YAML data and validates the container in one step.
-// Returns a ValidationError if validation fails, allowing inspection of which options failed.
+// Returns a ValidationErrors if validation fails, allowing inspection of which options failed.
 func (oc *Container[T]) ParseAndValidate(data []byte) error {
 	if err := oc.Parse(data); err != nil {
 		return err
 	}
-	if !oc.IsValid() {
-		return &ValidationError{
-			Container:      oc.name,
-			InvalidOptions: []string{},
-		}
-	}
-	return nil
+	return oc.Validate("$").ErrorOrNil()
 }
 
 // ParseAndValidateFile reads data from a file, parses it, and validates the container.

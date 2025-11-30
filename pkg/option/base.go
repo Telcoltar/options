@@ -2,7 +2,6 @@ package option
 
 import (
 	"fmt"
-	"log"
 	"maps"
 	"reflect"
 	"strconv"
@@ -78,6 +77,10 @@ type OptionGet[T any] interface {
 	HasValue() bool
 }
 
+// CheckFunc is a validation check that returns an error message if validation fails.
+// Return empty string if validation passes.
+type CheckFunc[T any] func(value T) string
+
 type baseOption[T any, Self any] struct {
 	defaultValue         *T
 	jsonSchemaProperties map[string]any
@@ -86,7 +89,7 @@ type baseOption[T any, Self any] struct {
 	required             bool
 	value                *T
 	valueFormatFunc      func(value T) string
-	checks               []func(value T) bool
+	checks               []CheckFunc[T]
 	transform            func(value T) T
 	self                 Self
 }
@@ -178,23 +181,29 @@ func (o *baseOption[T, Self]) StrValue() string {
 // if no value is set, but a defaultValue return true
 // if neither is set, return false
 func (o *baseOption[T, Self]) IsValid() bool {
+	return !o.Validate("$").HasErrors()
+}
+
+// Validate performs validation and returns all errors with their JSONPath locations.
+// The path parameter is the JSONPath prefix for this option (e.g., "$.config" or "$").
+func (o *baseOption[T, Self]) Validate(path string) *ValidationErrors {
+	errs := NewValidationErrors()
+
 	if o.value != nil {
 		for _, check := range o.checks {
-			if !check(*o.value) {
-				log.Println("not valid: ", o.name)
-				return false
+			if msg := check(*o.value); msg != "" {
+				errs.Add(path, msg)
 			}
 		}
-		return true
+		return errs
 	}
 	if o.defaultValue != nil {
-		return true
+		return errs
 	}
 	if o.required {
-		log.Println("not valid empty and required: ", o.name)
-		return false
+		errs.Add(path, fmt.Sprintf(`required field "%s" is missing`, path))
 	}
-	return true
+	return errs
 }
 
 // GetValid returns Get(),IsValid()
@@ -213,12 +222,14 @@ func (o *baseOption[T, Self]) EmptyDefault() Self {
 	return o.self
 }
 
-func (o *baseOption[T, Self]) Checks(checks ...func(value T) bool) Self {
+func (o *baseOption[T, Self]) Checks(checks ...CheckFunc[T]) Self {
 	o.checks = append(o.checks, checks...)
 	return o.self
 }
 
-func (o *baseOption[T, Self]) Check(check func(value T) bool, jsonProp map[string]any) Self {
+// Check adds a validation check with an error message and optional JSON Schema properties.
+// The check function should return an empty string if validation passes, or an error message if it fails.
+func (o *baseOption[T, Self]) Check(check CheckFunc[T], jsonProp map[string]any) Self {
 	o.checks = append(o.checks, check)
 	maps.Copy(o.jsonSchemaProperties, jsonProp)
 	return o.self
@@ -231,13 +242,13 @@ func (o *baseOption[T, Self]) Transform(transform func(value T) T) Self {
 
 func (o *baseOption[T, Self]) Enum(allowedValues ...T) Self {
 	o.jsonSchemaProperties["enum"] = allowedValues
-	o.checks = append(o.checks, func(value T) bool {
+	o.checks = append(o.checks, func(value T) string {
 		for _, allowed := range allowedValues {
 			if reflect.DeepEqual(value, allowed) {
-				return true
+				return ""
 			}
 		}
-		return false
+		return fmt.Sprintf("value must be one of %v", allowedValues)
 	})
 	return o.self
 }
